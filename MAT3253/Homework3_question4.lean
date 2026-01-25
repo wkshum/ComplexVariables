@@ -9,6 +9,10 @@ and if there exists a positive number \( M \) such that \( |g(z)| \leq M \)
 for all \( z \) in some neighborhood of \( z_0 \).
 -/ 
 
+import Mathlib.Tactic
+
+open Complex
+
 /- 
 Standard Epsilon-Delta definition of a limit for complex functions.
 lim_{z → z₀} f(z) = L
