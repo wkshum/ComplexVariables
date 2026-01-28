@@ -1,6 +1,15 @@
 /-
   MAT3253 Complex variables
   Homework 3 Question 5
+
+Let T(z) be Mobius transformation  (a z + b) / (c z + d).
+
+Part (a), show that if c is equal to 0, then `T(z) → ∞` as `z → ∞` 
+
+Part (b1), show that if c is nonzero, then `T(z) → a/c` as `z → ∞` 
+
+Part (b2), show that if c is nonzero, then `T(z) → ∞` as `z → -d/c` 
+
 -/
 
 
