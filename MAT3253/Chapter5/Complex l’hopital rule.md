@@ -1,8 +1,8 @@
 **Theorem.**
 Let $f, g: \mathbb{C} \to \mathbb{C}$ be complex functions differentiable at a point $z_0$. Suppose $f(z_0) = 0$, $g(z_0) = 0$, and $g'(z_0) \neq 0$. Then:
-$$
+\[
 \lim_{z \to z_0} \frac{f(z)}{g(z)} = \frac{f'(z_0)}{g'(z_0)}.
-$$
+\]
 
 **Proof.**
 Since $f$ and $g$ are differentiable at $z_0$, their derivatives are defined by the limits of their difference quotients:
