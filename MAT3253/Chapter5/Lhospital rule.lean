@@ -88,12 +88,22 @@ theorem complex_lhopital_zero_zero
 
 
 
+
 /-
 Checking definitions of iteratedDeriv, HasDerivAt, and deriv.
 -/
 #check iteratedDeriv
 #check HasDerivAt
 #check deriv
+
+/-- 
+Definition: A function g has a zero of order m at z₀ if 
+its first m-1 derivatives vanish, and the m-th derivative is non-zero.
+-/
+def HasZeroOrder (g : ℂ → ℂ) (z₀ : ℂ) (m : ℕ) : Prop :=
+  (∀ k < m, iteratedDeriv k g z₀ = 0) ∧ (iteratedDeriv m g z₀ ≠ 0)
+
+
 
 /-
 L'Hopital's rule for complex functions at a point where 
