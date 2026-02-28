@@ -2262,7 +2262,7 @@ def cross_ratio (z0 z1 z2 z3 : EComplex) : EComplex :=
     (z0 - z1) / (z0 - z3)
   | some z1, some z2, none =>
     (z0 - z1) / (z2 - z1)
-  | _, _, _ => 0  -- junk value
+  | _, _, _ => none  -- junk value
 
 /-
 Verification theorems for the cross ratio definition, corresponding to the cases specified by the user.
