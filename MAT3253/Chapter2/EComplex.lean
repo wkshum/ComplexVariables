@@ -24,8 +24,8 @@ Main content:
 * Define the action of a linear transformaction on extended complex number.
 
 * Verify that it is compatible with the law of composition.
-  
-* At the end, we can register linear fractional transformations as an 
+
+* At the end, we can register linear fractional transformations as an
   in stance of group and an instance of group action on `EComplex`.
 
 -/
@@ -233,7 +233,7 @@ theorem EComplex_addition (x : EComplex) (y : EComplex)
 theorem EComplex_multiplication (x : EComplex) (y : EComplex)
   : EComplex.mul x y = x * y := by simp; rfl
 
--- z + ∞ = ∞ 
+-- z + ∞ = ∞
 @[simp]
 theorem finite_add_infinity {z : ℂ} : z + infty = infty := by rfl
 
@@ -241,7 +241,7 @@ theorem finite_add_infinity {z : ℂ} : z + infty = infty := by rfl
 @[simp]
 theorem infinity_add_finite {z : ℂ} : infty + z = infty := by rfl
 
--- z · ∞ = ∞ 
+-- z · ∞ = ∞
 @[simp]
 theorem finite_mul_infinity {z : ℂ} : z * infty = infty := by rfl
 
@@ -392,20 +392,20 @@ theorem coe_div (x y : ℂ) (hy : y ≠ 0) : (↑(x / y) : EComplex) = x / y := 
   rfl
 
 
--- 1 / ∞ = 0 
+-- 1 / ∞ = 0
 @[simp]
-theorem infty_inv : Inv.inv infty = 0 := by 
+theorem infty_inv : Inv.inv infty = 0 := by
   rfl
-  
--- 1 / 0 = ∞ 
+
+-- 1 / 0 = ∞
 @[simp]
-theorem zero_inv : Inv.inv (0: EComplex) = infty := by 
+theorem zero_inv : Inv.inv (0: EComplex) = infty := by
   simp only [Inv.inv, EComplex.inv]
   rfl
 
 -- z/∞ = 0  for all z:ℂ
 @[simp]
-theorem complex_div_infty {z : ℂ} : (z : EComplex).div infty = 0 := by 
+theorem complex_div_infty {z : ℂ} : (z : EComplex).div infty = 0 := by
   simp [EComplex.div, infty, EComplex.inv]
   -- now goal is (↑z * ↑0) = 0, unfold mul and reduce
   norm_cast
@@ -419,9 +419,9 @@ theorem complex_div_infty_slash {z : ℂ} : (z : EComplex) / infty = 0 := by
   change (z : EComplex).div infty = 0
   simp [complex_div_infty (z := z)]
 
--- Usually, ∞/∞ is undefined, 
+-- Usually, ∞/∞ is undefined,
 -- but in this implementation, we have ∞/∞ = ∞ by convention
-example : infty.div infty = infty := by 
+example : infty.div infty = infty := by
   simp [EComplex.div, infty, EComplex.inv]
   norm_cast
 
@@ -436,17 +436,22 @@ end EComplex
   Linear fractional transformation on Riemann sphere
 -/
 
+/-!
+We represent linear fractional transformation by a structure
+consisting of four complex numbers `a`, `b`, `c`, `d`
+and an evidance that `a*d-b*c` is nonzero.
+-/
 @[ext]
-structure LinearFractionalTransformation where
+structure LinearFracTrans where
   a : ℂ
   b : ℂ
   c : ℂ
   d : ℂ
   determinant_ne_zero : a * d - b * c ≠ 0
 
-namespace LinearFractionalTransformation
+namespace LinearFracTrans
 
-/-! Define the action of a linear fractional transformation on EComplex
+/-! The action of a linear fractional transformation on EComplex
 
   Given a linear fractional transformation f(z) = (az + b) / (cz + d),
   we define its action on an extended complex number z as follows:
@@ -455,7 +460,7 @@ namespace LinearFractionalTransformation
   f(∞) = a/c if c ≠ 0
   f(∞) = ∞ if c = 0
 -/
-def apply (f : LinearFractionalTransformation) (z : EComplex) : EComplex :=
+def apply (f : LinearFracTrans) (z : EComplex) : EComplex :=
   if f.c = 0 then
         match z with
         | some z => some ((f.a / f.d) * z + (f.b / f.d) )
@@ -469,7 +474,7 @@ def apply (f : LinearFractionalTransformation) (z : EComplex) : EComplex :=
 
 
 -- testing the apply function
-def f_test : LinearFractionalTransformation :=
+def f_test : LinearFracTrans :=
   { a:= 1, b := 2, c := 0, d:= 1, determinant_ne_zero := by simp}
 
 #check apply f_test (some 8)
@@ -478,16 +483,16 @@ def f_test : LinearFractionalTransformation :=
 
 -- Convert the apply function to a coercion,
 -- so that we can write f z instead of apply f z
-instance : CoeFun LinearFractionalTransformation (fun _ => EComplex → EComplex) where
+instance : CoeFun LinearFracTrans (fun _ => EComplex → EComplex) where
   coe f := f.apply
 
 @[simp]
-theorem apply_lft_coe (f : LinearFractionalTransformation) (z : ℂ) :
+theorem apply_lft_coe (f : LinearFracTrans) (z : ℂ) :
   f z = f (some z) := rfl
 
 -- define an example linear fractional transformation
 -- f(z) = (1z + 2) / (0z + 1) = z + 2
-def f_test1 : LinearFractionalTransformation :=
+def f_test1 : LinearFracTrans :=
  { a:= 1, b := 2, c := 0, d:= 1, determinant_ne_zero := by simp}
 
 -- testing the function application
@@ -524,13 +529,13 @@ lemma b_c_nonzero_of_a_zero {a b c d : ℂ} (hdet : a * d - b * c ≠ 0) (ha : a
 
 -- if f.c = 0, then f(∞) = ∞
 @[simp]
-theorem f_infty_infty {f : LinearFractionalTransformation} (hc : f.c = 0) :
+theorem f_infty_infty {f : LinearFracTrans} (hc : f.c = 0) :
     f ∞ = ∞ := by
   simp [apply, hc]
 
 -- if f.c = 0, then f(z) = (az+b)/d
 @[simp]
-theorem f_z_azbd {f : LinearFractionalTransformation} {z : ℂ} (hc : f.c = 0) :
+theorem f_z_azbd {f : LinearFracTrans} {z : ℂ} (hc : f.c = 0) :
     f z = (f.a*z+f.b)/f.d := by
   simp [apply, hc]
   have hd_ne_zero : f.d ≠ 0 := (a_d_nonzero_of_c_zero f.determinant_ne_zero hc).2
@@ -541,14 +546,14 @@ theorem f_z_azbd {f : LinearFractionalTransformation} {z : ℂ} (hc : f.c = 0) :
 
 -- if f.c ≠ 0, then f(∞) = a/c
 @[simp]
-theorem f_infty_a_div_c {f : LinearFractionalTransformation} (hc : f.c ≠ 0) :
+theorem f_infty_a_div_c {f : LinearFracTrans} (hc : f.c ≠ 0) :
     f ∞ = f.a/f.c := by
   simp [apply, hc]
   norm_cast
 
 -- if f.c ≠ 0 and z = -d/c, then f(z) = ∞
 @[simp]
-theorem f_neg_d_div_c_infty {f : LinearFractionalTransformation} (hc : f.c ≠ 0) :
+theorem f_neg_d_div_c_infty {f : LinearFracTrans} (hc : f.c ≠ 0) :
     f (-f.d/f.c) = ∞ := by
   -- Unfold `apply` and use `hc` to show 'if f.c = 0' is false
   simp [apply, if_neg hc]
@@ -558,7 +563,7 @@ theorem f_neg_d_div_c_infty {f : LinearFractionalTransformation} (hc : f.c ≠ 0
 
 -- if f.c ≠ 0 and z ≠ -d/c, then f(z) = (az+b)/(cz+d)
 @[simp]
-theorem f_value_when_c_nonzero {f : LinearFractionalTransformation} {z : ℂ}
+theorem f_value_when_c_nonzero {f : LinearFracTrans} {z : ℂ}
     (hc : f.c ≠ 0) (hz : z ≠ -f.d / f.c) :
     f z = (f.a*z + f.b)/(f.c*z + f.d) := by
   simp only [apply, hc, if_neg hz, ↓reduceIte]
@@ -576,15 +581,15 @@ theorem f_value_when_c_nonzero {f : LinearFractionalTransformation} {z : ℂ}
 
 /-! composition of linear fractional transformations
 
-If f(z) = (az + b) / (cz + d) and g(z) = (a'z + b') / (c'z + d'),
-then the composition f ∘ g is given by:
+Given f(z) = (az + b) / (cz + d) and g(z) = (a'z + b') / (c'z + d'),
+we define the composition f ∘ g by:
 (f ∘ g)(z) = (a(a'z + b') + b(c'z + d')) / (c(a'z + b') + d(c'z + d'))
 
-We also check that the determinant of the composition is nonzero,
+We check that the determinant of the composition is nonzero,
 which ensures that the composition is also a linear fractional transformation.
 -/
-def comp (f : LinearFractionalTransformation) (g : LinearFractionalTransformation)
-   : LinearFractionalTransformation where
+def comp (f g : LinearFracTrans)
+   : LinearFracTrans where
   a := f.a * g.a + f.b * g.c
   b := f.a * g.b + f.b * g.d
   c := f.c * g.a + f.d * g.c
@@ -601,7 +606,7 @@ def comp (f : LinearFractionalTransformation) (g : LinearFractionalTransformatio
 
 /-! The identity linear fractional transformation
 -/
-def id : LinearFractionalTransformation where
+def id : LinearFracTrans where
   a := 1
   b := 0
   c := 0
@@ -612,11 +617,11 @@ def id : LinearFractionalTransformation where
 
 -- The linear fractional transformation defined above
 -- is the identity element for composition of linear fractional transformations
-instance : One LinearFractionalTransformation where
+instance : One LinearFracTrans where
   one := id
 
 -- identity LFT maps ∞ maps to ∞
-lemma id_apply_infty : (id : LinearFractionalTransformation) ∞ = ∞ := by
+lemma id_apply_infty : (id : LinearFracTrans) ∞ = ∞ := by
   -- Unfold definitions down to the 'apply' function
   dsimp [One.one, id, apply]
   simp only [↓reduceIte]
@@ -626,7 +631,7 @@ lemma id_apply_infty : (id : LinearFractionalTransformation) ∞ = ∞ := by
   when f is the identity linear fractional transformation defined above.
 -/
 @[simp]
-theorem id_apply (z : EComplex) : (id : LinearFractionalTransformation) z = z := by
+theorem id_apply (z : EComplex) : (id : LinearFracTrans) z = z := by
   -- Unfold definitions
   dsimp [One.one, id, apply]
   -- Simplify the arithmetic coefficients using the fact that a=1, b=0, c=0, d=1
@@ -639,12 +644,257 @@ theorem id_apply (z : EComplex) : (id : LinearFractionalTransformation) z = z :=
   | none => rfl    -- Case ∞: returns ∞
   | some val => rfl -- Case Finite: returns val (since 1*val + 0 = val)
 
+/-!
+  A Linear Fractional Transformation is a Translation if it is of the form f(z) = z + b.
+  Normalized form: a=1, c=0, d=1.
+-/
+def IsTranslation (f : LinearFracTrans) : Prop :=
+  f.c = 0 ∧ f.a = f.d
 
------------------------
----     Helper lemmas
------------------------
+/-!
+  A Linear Fractional Transformation is a Scaling (Dilation) if it is of the form f(z) = az.
+  Normalized form: b=0, c=0, d=1. (Note: a must be non-zero from determinant condition).
+-/
+def IsScaling (f : LinearFracTrans) : Prop :=
+  f.b = 0 ∧ f.c = 0
 
-private lemma case11 {f g : LinearFractionalTransformation} {z : EComplex}
+
+/-!
+  A Linear Fractional Transformation is the standard Inversion f(z) = 1/z.
+  Normalized form: a=0, b=1, c=1, d=0.
+-/
+def IsInversion (f : LinearFracTrans) : Prop :=
+  f.a = 0 ∧ f.d = 0 ∧ f.b = f.c
+
+/-!
+  A Linear Fractional Transformation is Affine if it is of the form f(z) = az + b.
+  This corresponds to c=0.
+-/
+def IsAffine (f : LinearFracTrans) : Prop :=
+  f.c = 0
+
+/-
+Constructor for a general LFT
+-/
+def mk_lft (a b c d : ℂ) (h : a * d - b * c ≠ 0) : LinearFracTrans :=
+  { a := a, b := b, c := c, d := d, determinant_ne_zero := h }
+
+
+/-
+Translation transformation z ↦ z + t.
+-/
+def translation (t : ℂ) : LinearFracTrans :=
+  { a := 1, b := t, c := 0, d := 1,
+    determinant_ne_zero := by simp }
+
+/-
+Scaling transformation z ↦ k * z, where k ≠ 0.
+-/
+def scaling (k : ℂ) (h : k ≠ 0) : LinearFracTrans :=
+  { a := k, b := 0, c := 0, d := 1,
+    determinant_ne_zero := by simp [h] }
+
+/-
+Inversion transformation z ↦ 1/z.
+-/
+def inversion : LinearFracTrans :=
+  { a := 0, b := 1, c := 1, d := 0,
+    determinant_ne_zero := by simp }
+
+
+
+-- translation is a special case of affine transformation
+theorem IsTranslation_implies_IsAffine (f : LinearFracTrans)
+  (h : IsTranslation f) : IsAffine f := by
+  -- h : f.c = 0 ∧ f.a = f.d
+  -- IsAffine requires f.c = 0
+  exact h.1
+
+-- scaling is a special case of affine transformation
+theorem IsScaling_implies_IsAffine (f : LinearFracTrans)
+  (h : IsScaling f) : IsAffine f := by
+  -- h : f.b = 0 ∧ f.c = 0
+  -- IsAffine requires f.c = 0
+  exact h.2
+
+-- inversion is not affine
+theorem IsInversion_implies_NotAffine (f : LinearFracTrans)
+  (h : IsInversion f) : ¬ IsAffine f := by
+  -- h : f.a = 0 ∧ f.d = 0 ∧ f.b = f.c
+  -- det = a*d - b*c = 0 - c*c = -c^2 ≠ 0 => c ≠ 0
+  intro h_aff
+  rw [IsAffine] at h_aff
+  have h_det := f.determinant_ne_zero
+  rw [h.1, h.2.1, h.2.2, h_aff, zero_mul, sub_zero] at h_det
+  exact h_det rfl
+
+theorem IsAffine_iff_affine_action (f : LinearFracTrans) :
+  IsAffine f ↔ ∃ A B : ℂ , A ≠ 0 ∧ ∀ (z : ℂ), f z = A * z + B := by
+  constructor
+  · -- Forward: If c=0, then f(z) = (a/d)z + (b/d)
+    intro h_affine
+    -- Since c=0, a*d ≠ 0 => d ≠ 0 and a ≠ 0
+    have h_ad_ne0 : f.a * f.d ≠ 0 := by
+      have h_det := f.determinant_ne_zero
+      rw [h_affine, mul_zero, sub_zero] at h_det
+      exact h_det
+
+    have hd_ne0 : f.d ≠ 0 := by
+      exact right_ne_zero_of_mul h_ad_ne0
+
+    use (f.a / f.d), (f.b / f.d)
+    constructor
+    · have h_frac_ne0 : (f.a / f.d) ≠ 0 := by
+        apply div_ne_zero
+        · exact left_ne_zero_of_mul h_ad_ne0
+        · exact right_ne_zero_of_mul h_ad_ne0
+
+      dsimp [EComplex.some, Zero.zero]
+      assumption
+
+    · -- Formula matches
+      intro z
+      -- Use the earlier lemma f_z_azbd (f.c = 0)
+      rw [f_z_azbd h_affine]
+      norm_cast
+      field_simp [right_ne_zero_of_mul h_ad_ne0]
+
+  · -- Backward: If f(z) = Az + B, then c=0
+    rintro ⟨A, B, hA, h_eq⟩
+    by_contra hc_ne0
+    have hc_ne0_val : f.c ≠ 0 := hc_ne0
+
+    -- If c ≠ 0, then at z = -d/c, f(z) = ∞
+    let z_pole := -f.d / f.c
+    have h_pole : f z_pole = ∞ := by
+      -- Unfold the definition of z_pole
+      dsimp [z_pole]
+      have h_coe: ((-↑f.d / ↑f.c) : EComplex) = some (-f.d / f.c) := by norm_cast
+      rw [← h_coe]
+      exact f_neg_d_div_c_infty hc_ne0_val
+
+    -- But the formula says f(z) = Az + B (finite)
+    have h_finite : f z_pole = A * z_pole + B := h_eq z_pole
+
+    -- Contradiction: ∞ = finite
+    rw [h_finite] at h_pole
+    contradiction
+
+theorem IsAffine_iff_infty (f : LinearFracTrans) :
+  f.IsAffine ↔ f EComplex.infty = EComplex.infty := by
+    -- By definition of IsAffine, we know that f.c = 0.
+    simp [LinearFracTrans.IsAffine];
+    -- By definition of f, we know that
+    -- f (infty) = infty if and only if f.c = 0.
+    simp [LinearFracTrans.apply];
+    simp [EComplex.infty]
+
+
+/- (Theorem 2.3.3 part b)
+Decomposition of a linear fractional transformation with c ≠ 0
+into translation, scaling, inversion, translation, and scaling.
+	\frac{az+b}{cz+d} = \frac{a}{c} + \frac{bc-ad}{c} \frac{1}{cz+d}.
+-/
+lemma decomposition_nonaffine (f : LinearFracTrans) (hc : f.c ≠ 0) :
+  let t1 := translation (f.a / f.c)
+  let k := (f.b * f.c - f.a * f.d) / f.c
+  let s1 := scaling k (by
+    simp +zetaDelta
+    exact ⟨ fun h => f.determinant_ne_zero <| by linear_combination -h, hc ⟩)
+  let i := inversion
+  let t2 := translation f.d
+  let s2 := scaling f.c hc
+  f = t1.comp (s1.comp (i.comp (t2.comp s2))) := by
+    unfold comp translation scaling inversion;
+    simp --
+    ring_nf
+    aesop
+
+
+/-
+When c=0, the linear fractional transformation can be decomposed
+into scalings, translations.
+-/
+lemma decomposition_affine (f : LinearFracTrans) (hc : f.c = 0) :
+  let s_a := scaling f.a (by
+    have h := f.determinant_ne_zero
+    rw [hc] at h
+    simp at h
+    exact h.1)
+  let t_b := translation f.b
+  let s_d := scaling f.d (by
+    have h := f.determinant_ne_zero
+    rw [hc] at h
+    simp at h
+    exact h.2)
+  let i := inversion
+  f = (i.comp (s_d.comp i)).comp (t_b.comp s_a) := by
+    simp [comp, inversion, scaling, translation ]
+    ring_nf at *
+    aesop
+    -- aesop ( simp_config := { decide := true } )
+
+
+
+/-
+Define the property of being decomposable into basic transformations
+-/
+inductive IsDecomposable : LinearFracTrans → Prop
+| translation (t : Complex) : IsDecomposable (LinearFracTrans.translation t)
+| scaling (k : Complex) (h : k ≠ 0) : IsDecomposable (LinearFracTrans.scaling k h)
+| inversion : IsDecomposable LinearFracTrans.inversion
+| comp (f g : LinearFracTrans) : IsDecomposable f → IsDecomposable g → IsDecomposable (f.comp g)
+
+
+
+/-
+Prove the general decomposition theorem for any linear fractional transformation
+-/
+theorem decomposition_general (f : LinearFracTrans) : IsDecomposable f := by
+  by_cases hc : f.c = 0
+  · let decomp := LinearFracTrans.decomposition_affine f hc
+    rw [decomp]
+    apply IsDecomposable.comp
+    · apply IsDecomposable.comp
+      · apply IsDecomposable.inversion
+      · apply IsDecomposable.comp
+        · apply IsDecomposable.scaling
+        · apply IsDecomposable.inversion
+    · apply IsDecomposable.comp
+      · apply IsDecomposable.translation
+      · apply IsDecomposable.scaling
+
+  · -- Case c ≠ 0
+    -- We use the decomposition theorem provided by the user
+    let decomp := decomposition_nonaffine f hc
+    rw [decomp]
+    -- The RHS is a composition of basic transformations
+    -- f = t1.comp (s1.comp (i.comp (t2.comp s2)))
+    apply IsDecomposable.comp
+    · apply IsDecomposable.translation
+    · apply IsDecomposable.comp
+      · apply IsDecomposable.scaling
+      · apply IsDecomposable.comp
+        · apply IsDecomposable.inversion
+        · apply IsDecomposable.comp
+          · apply IsDecomposable.translation
+          · apply IsDecomposable.scaling
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------
+---     Helper lemmas for the proof about composition of LFTs
+-------------------------------------------------------------
+
+private lemma case11 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c = 0) (hg : g.c = 0)
   : (comp f g) z = f (g z) := by
   -- In this case, all three transformations are affine.
@@ -698,7 +948,7 @@ private lemma case11 {f g : LinearFractionalTransformation} {z : EComplex}
 
 -- When lft f is affine and lft g is not affine,
 -- then the composition f ∘ g is not affine.
-private lemma comp_f_g_not_affine1 {f g : LinearFractionalTransformation}
+private lemma comp_f_g_not_affine1 {f g : LinearFracTrans}
   (hf : f.c = 0) (hg : g.c ≠ 0) : (comp f g).c ≠ 0 := by
   -- 1. Unfold the definition of composition for 'c'
   --    (comp).c = f.c * g.a + f.d * g.c
@@ -721,7 +971,7 @@ private lemma comp_f_g_not_affine1 {f g : LinearFractionalTransformation}
 
 -- When lft g is affine and lft f is not affine,
 -- then the composition f ∘ g is not affine.
-private lemma comp_f_g_not_affine2 {f g : LinearFractionalTransformation}
+private lemma comp_f_g_not_affine2 {f g : LinearFracTrans}
   (hf : f.c ≠ 0) (hg : g.c = 0) : (comp f g).c ≠ 0 := by
   simp only [comp]
   rw [hg, mul_zero, add_zero]
@@ -731,11 +981,11 @@ private lemma comp_f_g_not_affine2 {f g : LinearFractionalTransformation}
     rw [hg] at h_det
     simp only [mul_zero, sub_zero, ne_eq] at h_det
     exact left_ne_zero_of_mul h_det  -- Extract d ≠ 0
-  
+
 
 -- if z is a pole of g, then z is also a pole of the composition f ∘ g,
 --  and both sides equal ∞
-private lemma case121 {f g : LinearFractionalTransformation} {z : EComplex}
+private lemma case121 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c = 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
   (h_pole : g.c * z + g.d = 0)
   : (comp f g) z = f (g z) := by
@@ -796,7 +1046,7 @@ private lemma case121 {f g : LinearFractionalTransformation} {z : EComplex}
     rw [if_pos hh]
     simp [apply, hf, hg, h_z_val]
 
-private lemma case122 {f g : LinearFractionalTransformation} {z : EComplex}
+private lemma case122 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c = 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
   (h_non_pole : g.c * z + g.d ≠ 0)
   : (comp f g) z = f (g z) := by
@@ -899,7 +1149,7 @@ private lemma case122 {f g : LinearFractionalTransformation} {z : EComplex}
       ring
 
 -- f.c ≠ 0, g.c = 0, and z is not a pole of the composition f ∘ g,
-private lemma case211 {f g : LinearFractionalTransformation} {z : EComplex}
+private lemma case211 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c ≠ 0) (hg : g.c = 0) (h_comp : (comp f g).c ≠ 0)
   (h_pole : f.c * g.a * z + (f.c * g.b + f.d * g.d) = 0)
   : (comp f g) z = f (g z) := by
@@ -964,7 +1214,7 @@ private lemma case211 {f g : LinearFractionalTransformation} {z : EComplex}
             apply Option.some.inj
             --simpa [EComplex.add, EComplex.mul, add_assoc, add_left_comm, add_comm, mul_assoc] using h_pole
             assumption
-            
+
           -- reassociate to f.c*(g.a*z+g.b) + f.d*g.d = 0
           have : f.c * (g.a * z + g.b) + f.d * g.d = 0 := by
             -- expand and match
@@ -1007,7 +1257,7 @@ private lemma case211 {f g : LinearFractionalTransformation} {z : EComplex}
         -- so turn g z into that and simp
         simp [apply, hg, hf]
         field_simp [hd_g]
-        field_simp [hd_g] at h_gz_pole 
+        field_simp [hd_g] at h_gz_pole
         assumption
 
       -- Finish
@@ -1015,7 +1265,7 @@ private lemma case211 {f g : LinearFractionalTransformation} {z : EComplex}
         -- use computed LHS/RHS
         simp [hL, hR])
 
-private lemma case212 {f g : LinearFractionalTransformation} {z : EComplex}
+private lemma case212 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c ≠ 0) (hg : g.c = 0) (h_comp : (comp f g).c ≠ 0)
   (h_not_pole : f.c * g.a * z + (f.c * g.b + f.d * g.d) ≠ 0)
   : (comp f g) z = f (g z) := by
@@ -1040,7 +1290,7 @@ private lemma case212 {f g : LinearFractionalTransformation} {z : EComplex}
         intro h0
         apply h_not_pole
         -- show the EComplex expression is 0
-        exact congrArg EComplex.some h0           
+        exact congrArg EComplex.some h0
 
       -- hence z is not the pole of comp: z ≠ -(comp.d)/(comp.c)
       have hz_notpole_comp : z ≠ -(comp f g).d / (comp f g).c := by
@@ -1098,11 +1348,11 @@ private lemma case212 {f g : LinearFractionalTransformation} {z : EComplex}
       rw [f_value_when_c_nonzero (f := comp f g) (z := z) h_comp hz_notpole_comp]
       rw [f_z_azbd (f := g) (z := z) hg]
       norm_cast
-      
+
       -- make the argument visibly `some w`
       change ↑((f.comp g).a * z + (f.comp g).b) / ↑((f.comp g).c * z + (f.comp g).d) = f.apply ↑w
       simp [apply, hf]
-      
+
       -- turn f (some w) into f w and apply the “c≠0” formula
       simp [hw_notpole]
       -- rw [← apply_lft_coe (f := f) (z := w)]
@@ -1113,7 +1363,7 @@ private lemma case212 {f g : LinearFractionalTransformation} {z : EComplex}
       dsimp [w, comp]
       simp [hg]
       norm_cast
-        
+
       change
         (EComplex.some
           ((f.a * g.a * z + (f.a * g.b + f.b * g.d)) /
@@ -1122,16 +1372,16 @@ private lemma case212 {f g : LinearFractionalTransformation} {z : EComplex}
         EComplex.some
           ((f.a * ((g.a * z + g.b) / g.d) + f.b) /
             (f.c * ((g.a * z + g.b) / g.d) + f.d))
-      simp only [EComplex.coe_eq_coe_iff] 
-      have h_ne_1 : f.c * g.a * z + (f.c * g.b + f.d * g.d) ≠ 0:= by 
+      simp only [EComplex.coe_eq_coe_iff]
+      have h_ne_1 : f.c * g.a * z + (f.c * g.b + f.d * g.d) ≠ 0:= by
         have : f.c * g.a * z + (f.c * g.b + f.d * g.d) =f.c * g.a * z + (f.c * g.b + f.d * g.d)
           := by ring
         rwa [this]
-        
-      field_simp 
+
+      field_simp
       ring
-      
-private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
+
+private lemma case221 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c ≠ 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c = 0)
     : (comp f g) z = f (g z) := by
   -- We first do some simple arithemtic to be used later
@@ -1139,29 +1389,29 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
     simpa [comp] using h_comp
 
   -- We will need (comp f g).d ≠ 0 (since comp is a valid LFT and comp.c=0)
-  have hd_comp : (comp f g).d ≠ 0 := 
+  have hd_comp : (comp f g).d ≠ 0 :=
     (a_d_nonzero_of_c_zero (comp f g).determinant_ne_zero h_comp).2
 
-  have hd_comp' : g.b * f.c + g.d * f.d ≠ 0 := by 
+  have hd_comp' : g.b * f.c + g.d * f.d ≠ 0 := by
     -- 1. Unfold the definition of comp.d
     --    (comp f g).d = f.c * g.b + f.d * g.d
     dsimp [comp] at hd_comp
-    
+
     -- 2. Rearrange terms to match g.b * f.c + g.d * f.d
     --    hd_comp is: f.c * g.b + f.d * g.d ≠ 0
     rw [mul_comm g.b, mul_comm g.d]
     exact hd_comp
 
-  have hd_comp_a : (comp f g).a ≠ 0 := 
+  have hd_comp_a : (comp f g).a ≠ 0 :=
     (a_d_nonzero_of_c_zero (comp f g).determinant_ne_zero h_comp).1
-    
+
   have h_fcga : f.c * g.a = -(f.d * g.c) :=
     eq_neg_of_add_eq_zero_left hrel
 
   cases z with
   | none =>
       -- The compositie LFT is an affine function
-      -- It will maps ∞ to ∞ 
+      -- It will maps ∞ to ∞
 
       -- LHS: affine => ∞
       have hL : (comp f g) (∞ : EComplex) = ∞ := by
@@ -1179,7 +1429,7 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
       have hR : f (g (∞ : EComplex)) = ∞ := by
         -- g ∞ is finite; f sends that particular finite value to ∞
         -- because it equals the pole -f.d/f.c
-        simp [LinearFractionalTransformation.apply, hg, hf, hga]
+        simp [LinearFracTrans.apply, hg, hf, hga]
 
       simp [hL, hR]
 
@@ -1188,7 +1438,7 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
 
       by_cases hz : z = -g.d / g.c
       · -- Case 1
-        -- 
+        --
         -- When z=-g.d/g.c, z will eventually goes to f.a/f.c via ∞
         subst hz
         -- RHS: g(pole)=∞, so f(g(pole)) = f(∞) = f.a/f.c
@@ -1204,27 +1454,27 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
               simpa [EComplex.coe_neg] using (EComplex.coe_div (-g.d) g.c hg)
             have h0' : g.apply (↑(-g.d / g.c) : EComplex) = (∞ : EComplex) := by
               simpa [harg] using h0
-            simpa [apply, hf, h0'] 
+            simpa [apply, hf, h0']
           -- now apply f to ∞
           simp [this, f_infty_a_div_c (f := f) hf]
 
         -- LHS: comp is affine (c=0), so use f_z_azbd and show it equals f.a/f.c
         have hL :
             (comp f g) (EComplex.some (-g.d / g.c)) = (f.a / f.c : ℂ∞) := by
-          -- rewrite to ℂ input, then use affine formula 
+          -- rewrite to ℂ input, then use affine formula
           change (comp f g).apply (EComplex.some (-g.d / g.c)) = (f.a / f.c : ℂ∞)
           rw [f_z_azbd (f := comp f g) (z := -g.d / g.c) h_comp]
-          -- now it's a pure ℂ identity 
+          -- now it's a pure ℂ identity
           norm_cast
           dsimp [comp]
           -- use comp.c=0 as hrel; clear denominators
-          have : (g.b * f.c + g.d * f.d) ≠ 0 := by 
+          have : (g.b * f.c + g.d * f.d) ≠ 0 := by
             intro h0
             apply hd_comp
             -- turn h0 into the standard ordering f.c*g.b + f.d*g.d = 0
             have h0' : f.c * g.b + f.d * g.d = 0 := by
               simpa [mul_comm, mul_left_comm, mul_assoc, add_comm, add_left_comm, add_assoc] using h0
-            simpa [comp] using h0' -- now rewrite (comp f g).d 
+            simpa [comp] using h0' -- now rewrite (comp f g).d
           field_simp [hf, hg, hd_comp, this]
           ring_nf
 
@@ -1233,12 +1483,12 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
               -(f.a * g.a * g.d * f.c)
                   = f.a * g.d * (-(f.c*g.a)) := by ring
               _   = f.a * g.d * (-(-(f.d * g.c))) := by rw [h_fcga]
-              _   = f.a * g.c * g.d * f.d := by ring          
-                  
+              _   = f.a * g.c * g.d * f.d := by ring
+
           simp [h_main]
 
         -- Check that LHS and RHS are equal after some cosmetic changes
-        have hL': (f.comp g).apply (some (-g.d / g.c)) = (f.comp g).apply ↑(-g.d / g.c) 
+        have hL': (f.comp g).apply (some (-g.d / g.c)) = (f.comp g).apply ↑(-g.d / g.c)
           := by simp
         have hR':  f.apply (g.apply (some (-g.d / g.c))) = f.apply (g.apply ↑(-g.d / g.c))
           := by simp
@@ -1273,11 +1523,11 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
               rw [mul_comm] at hden_g
               field_simp [hden_g]
               ring
-              
+
             exact this
           -- Expand hw1 and use hrel to kill the z-term, leaving comp.d = 0
           have hcompd0 : (comp f g).d = 0 := by
-            dsimp [LinearFractionalTransformation.comp]
+            dsimp [LinearFracTrans.comp]
             -- hw1 expands to (f.c*g.a + f.d*g.c)*z + (f.c*g.b + f.d*g.d) = 0
             -- use hrel = 0 to eliminate the z term
             have : (f.c * g.b + f.d * g.d) = 0 := by
@@ -1300,14 +1550,14 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
 
             simpa using this
           exact hd_comp hcompd0
-     
+
         rw [← apply_lft_coe (f := comp f g) (z := z)]
         rw [f_z_azbd (f := comp f g) (z := z) h_comp]
         norm_cast
-      
+
         rw [(apply_lft_coe (f := g) (z := z)).symm]
         rw [f_value_when_c_nonzero (f := g) (z := z) hg hz]
-                      
+
         -- 1. Rewrite the argument of f to ↑w
         have h_arg : ((↑g.a * ↑z + ↑g.b) / (↑g.c * ↑z + ↑g.d) : EComplex) = (↑w : EComplex) := by
           -- Combine the EComplex operations into a single coercion
@@ -1317,8 +1567,8 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
           rw [this]
           rw [← EComplex.coe_div _ _ hden_g]
 
-        rw [h_arg]  
-        
+        rw [h_arg]
+
         -- 2. Rewrite f w using the non-pole formula (using hw)
         rw [f_value_when_c_nonzero (f := f) (z := w) hf hw]
 
@@ -1333,13 +1583,13 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
 
         -- 4. use norm_cast to make it an equation in complex number
         norm_cast
-        
+
         -- 5. Solve the algebra
         dsimp [w, comp]
-        -- Clear denominators: 
+        -- Clear denominators:
         -- hden_g (from g), hd_comp (from comp), hden_f (from f)
         field_simp [hden_g, hden_f, hd_comp']
-        have : (f.c * (g.a * z + g.b) + f.d * (g.c * z + g.d)) = 
+        have : (f.c * (g.a * z + g.b) + f.d * (g.c * z + g.d)) =
               f.c * g.b + f.d *g.d := by
           -- 1. Expand the products
           ring_nf
@@ -1348,31 +1598,31 @@ private lemma case221 {f g : LinearFractionalTransformation} {z : EComplex}
           -- 3. Simplify the result (cancellation)
           ring
         rw [this]
-        field_simp [hd_comp']                
+        field_simp [hd_comp']
         ring_nf
 
-private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
+private lemma case222a {f g : LinearFracTrans} {z : Complex}
   (hf : f.c ≠ 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
   (h_pole_g : g.c * z + g.d = 0)
-    : (comp f g) z = f (g z) := by 
+    : (comp f g) z = f (g z) := by
 
   -- change ↑z to (some z) in the goal
   have : (↑ z : EComplex) = some z := by exact rfl
   rw [this]
 
-  have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by 
+  have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by
     -- Unfold the definition of comp.c
     dsimp [comp] at h_comp
     -- Rearrange terms to match the goal
     -- h_comp is f.c * g.a + f.d * g.c
     rw [add_comm, mul_comm g.c]
-    exact h_comp     
+    exact h_comp
 
   have hz : z = -g.d / g.c := by
     rw [add_eq_zero_iff_eq_neg] at h_pole_g
     rw [eq_div_iff hg, mul_comm, ← neg_eq_iff_eq_neg]
-    exact neg_eq_iff_eq_neg.mpr h_pole_g 
-  
+    exact neg_eq_iff_eq_neg.mpr h_pole_g
+
   -- RHS: g(z) = ∞, so f(g(z)) = f(∞) = f.a / f.c
   have hR : f (g (some z)) = (f.a / f.c : ℂ∞) := by
       rw [hz]
@@ -1390,7 +1640,7 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
     field_simp [hg]
     -- reduces to f.c * (-det(g))
     intro h
-    have h_det : f.c * -(g.a * g.d - g.b * g.c) = 0 := by 
+    have h_det : f.c * -(g.a * g.d - g.b * g.c) = 0 := by
       ring_nf at h
       have : -(f.c * g.a * g.d) + f.c * g.c * g.b =  f.c * -(g.a * g.d - g.b * g.c) := by
         ring
@@ -1399,7 +1649,7 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
 
     have h_det_g_nz : -(g.a * g.d - g.b * g.c) ≠ 0 := by
       rw [neg_ne_zero]
-      exact g.determinant_ne_zero          
+      exact g.determinant_ne_zero
 
     exact mul_ne_zero hf h_det_g_nz h_det
 
@@ -1411,7 +1661,7 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
   rw [hR]
   rw [← apply_lft_coe (comp f g) z]
   rw [@f_value_when_c_nonzero (comp f g) _ h_comp h_z_not_pole_comp]
-  
+
   -- Algebra
   rw [hz]
   norm_cast
@@ -1424,17 +1674,17 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
 
   -- 2. Use that proof to push coercion inside division
   have : (↑((f.a * g.a + f.b * g.c) * (-g.d / g.c) + (f.a * g.b + f.b * g.d)) /
-    ↑((f.c * g.a + f.d * g.c) * (-g.d / g.c) + (f.c * g.b + f.d * g.d)) : EComplex)= 
+    ↑((f.c * g.a + f.d * g.c) * (-g.d / g.c) + (f.c * g.b + f.d * g.d)) : EComplex)=
     ↑(((f.a * g.a + f.b * g.c) * (-g.d / g.c) + (f.a * g.b + f.b * g.d)) /
     ((f.c * g.a + f.d * g.c) * (-g.d / g.c) + (f.c * g.b + f.d * g.d))) := by
       rw [← EComplex.coe_div _ _ h_denom_val_ne_zero]
-  
+
   rw [this]
   norm_cast   -- Now this successfully strips all EComplex wrappers
 
   -- 3. Prove the determinant helper (for robustness, though strictly not needed if field_simp has the right args)
-  have clear_det: -(g.d * (g.a * f.c + g.c * f.d)) + g.c * (g.b * f.c + g.d * f.d) ≠ 0 := by 
-    have : -(g.d * (g.a * f.c + g.c * f.d)) + g.c * (g.b * f.c + g.d * f.d) 
+  have clear_det: -(g.d * (g.a * f.c + g.c * f.d)) + g.c * (g.b * f.c + g.d * f.d) ≠ 0 := by
+    have : -(g.d * (g.a * f.c + g.c * f.d)) + g.c * (g.b * f.c + g.d * f.d)
             = f.c * -(g.a * g.d - g.b * g.c) := by ring
     rw [this]
     exact mul_ne_zero hf (neg_ne_zero.mpr g.determinant_ne_zero)
@@ -1443,29 +1693,29 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
     intro h_eq
     -- Substitute the known value of z (-g.d/g.c) into the equation
     rw [hz] at h_eq
-    
+
     -- Expand 'comp' and clear denominators
     dsimp [comp] at h_eq
     field_simp [hg, h_comp, h_gcfd] at h_eq
-    
-    -- Simplify the equation. 
+
+    -- Simplify the equation.
     -- The terms involving f.d will cancel out, leaving f.c * -det(g) = 0
     have h_contra : f.c * -(g.a * g.d - g.b * g.c) = 0 := by
-      -- ring_nf on h_eq moves terms around. 
+      -- ring_nf on h_eq moves terms around.
       -- We use it to show h_eq implies the determinant relation.
       have : f.c * g.a + g.c * f.d ≠ 0 := by
         rw [add_comm]
         exact h_gcfd
-        
+
       field_simp [this] at h_eq
       ring_nf at h_eq
       have h_sub : (-(g.d * f.c * g.a) - g.d * g.c * f.d) - (-(g.d * g.c * f.d) - f.c * g.c * g.b) = 0 := by
         rw [h_eq, sub_self]
-      have : -(g.d * f.c * g.a) - g.d * g.c * f.d - (-(g.d * g.c * f.d) - f.c * g.c * g.b) 
+      have : -(g.d * f.c * g.a) - g.d * g.c * f.d - (-(g.d * g.c * f.d) - f.c * g.c * g.b)
           = f.c * -(g.a * g.d - g.b * g.c) := by ring
       rw [← this]
       assumption
-      
+
     -- Derive contradiction
     -- We know f.c ≠ 0 and det(g) ≠ 0
     have h_det_nz : -(g.a * g.d - g.b * g.c) ≠ 0 := by
@@ -1478,18 +1728,18 @@ private lemma case222a {f g : LinearFractionalTransformation} {z : Complex}
   field_simp [hf, hg, h_denom_val_ne_zero]
   ring
 
-private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
+private lemma case222b {f g : LinearFracTrans} {z : Complex}
   (hf : f.c ≠ 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
   (h_not_pole_g : g.c * z + g.d ≠ 0)
     : (comp f g) z = f (g z) := by
 
-  have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by 
+  have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by
     -- Unfold the definition of comp.c
     dsimp [comp] at h_comp
     -- Rearrange terms to match the goal
     -- h_comp is f.c * g.a + f.d * g.c
     rw [add_comm, mul_comm g.c]
-    exact h_comp 
+    exact h_comp
 
   have hz : z ≠ -g.d / g.c := by
     intro h
@@ -1500,47 +1750,47 @@ private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
 
   -- Let w = g(z)
   let w : ℂ := (g.a * z + g.b) / (g.c * z + g.d)
-  
+
   -- Check if w is a pole of f (i.e., z is a pole of comp)
   by_cases h_pole_comp : (comp f g).c * z + (comp f g).d = 0
   · -- Case: z is a pole of comp -> LHS = ∞
     have hz_pole : z = -(comp f g).d / (comp f g).c := by
         rw [add_eq_zero_iff_eq_neg] at h_pole_comp
         rw [eq_div_iff h_comp, mul_comm, ← neg_eq_iff_eq_neg]
-        exact neg_eq_iff_eq_neg.mpr h_pole_comp 
-        
+        exact neg_eq_iff_eq_neg.mpr h_pole_comp
+
     -- LHS = ∞
     --rw [← apply_lft_coe (comp f g) z]
     rw [hz_pole]
     -- Apply the theorem for the function (comp f g)
-    have : (↑(-(f.comp g).d / (f.comp g).c) : EComplex) = 
+    have : (↑(-(f.comp g).d / (f.comp g).c) : EComplex) =
       (-↑ (f.comp g).d / ↑(f.comp g).c) := by norm_cast
     rw [this]
     rw [f_neg_d_div_c_infty h_comp]
-    
+
     -- RHS: We claim w is the pole of f
     have hw_pole : f.c * w + f.d = 0 := by
       dsimp [comp] at h_pole_comp
       -- Substitute w definition
       have : f.c * ((g.a*z+g.b)/(g.c*z+g.d)) + f.d = 0 := by
-          field_simp [h_not_pole_g]
-          have : z * g.c + g.d ≠ 0 := by
-            rw [mul_comm]
-            exact h_not_pole_g
-          -- Numerator matches pole condition
-          field_simp [this]
-          ring_nf
-          have : f.c * g.a * z + f.c * g.b + z * g.c * f.d + g.d * f.d
-            = (f.c * g.a + f.d * g.c) * z + (f.c * g.b + f.d * g.d)
-            := by ring
-          rw [this]
-          exact h_pole_comp
+        field_simp [h_not_pole_g]
+        have : z * g.c + g.d ≠ 0 := by
+          rw [mul_comm]
+          exact h_not_pole_g
+        -- Numerator matches pole condition
+        field_simp [this]
+        ring_nf
+        have : f.c * g.a * z + f.c * g.b + z * g.c * f.d + g.d * f.d
+          = (f.c * g.a + f.d * g.c) * z + (f.c * g.b + f.d * g.d)
+          := by ring
+        rw [this]
+        exact h_pole_comp
       exact this
-    
+
     have hw : w = -f.d / f.c := by
-        rw [add_eq_zero_iff_eq_neg] at hw_pole
-        rw [eq_div_iff hf, mul_comm, ← neg_eq_iff_eq_neg]
-        exact neg_eq_iff_eq_neg.mpr hw_pole
+      rw [add_eq_zero_iff_eq_neg] at hw_pole
+      rw [eq_div_iff hf, mul_comm, ← neg_eq_iff_eq_neg]
+      exact neg_eq_iff_eq_neg.mpr hw_pole
 
     -- RHS = f(w) = ∞
     have hR: f.apply (g.apply (-↑(f.comp g).d / ↑(f.comp g).c)) = none := by
@@ -1564,45 +1814,45 @@ private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
             rw [this]
             assumption
           field_simp [this] at h
-          have h_sub : g.c * (-(f.c * g.b) - f.d * g.d) + (g.d * (f.c * g.a + g.c * f.d)) 
+          have h_sub : g.c * (-(f.c * g.b) - f.d * g.d) + (g.d * (f.c * g.a + g.c * f.d))
             = 0 := by exact eq_neg_iff_add_eq_zero.mp h
-          
+
           -- normalize both sides
           ring_nf at h_sub
-          have h_neg : (g.c * f.c * g.b) - f.c * g.d * g.a = 0 := by 
+          have h_neg : (g.c * f.c * g.b) - f.c * g.d * g.a = 0 := by
             rw [← neg_eq_zero]
             ring_nf
             assumption
 
           ring_nf at h_neg
           ring_nf
-          have : g.c * f.c * g.b - f.c * g.d * g.a 
+          have : g.c * f.c * g.b - f.c * g.d * g.a
                 = -(f.c * g.a * g.d) + f.c * g.b * g.c := by ring
           rw [← this]
           exact h_neg
-          
+
         -- Contradiction
         have h_det_nz : -(g.a * g.d - g.b * g.c) ≠ 0 := by
           rw [neg_ne_zero]
           exact g.determinant_ne_zero
-          
-        exact mul_ne_zero hf h_det_nz h_contra          
-      
-      have : (↑(-(f.comp g).d / (f.comp g).c) : EComplex) = (-↑(f.comp g).d / ↑(f.comp g).c)  
+
+        exact mul_ne_zero hf h_det_nz h_contra
+
+      have : (↑(-(f.comp g).d / (f.comp g).c) : EComplex) = (-↑(f.comp g).d / ↑(f.comp g).c)
         := by norm_cast
       rw [← this]
-      rw [@f_value_when_c_nonzero g _ hg h_z_pole_neq] 
-      
-      have h_pole_f : ((↑g.a * ↑(-(f.comp g).d / (f.comp g).c) + ↑g.b) 
+      rw [@f_value_when_c_nonzero g _ hg h_z_pole_neq]
+
+      have h_pole_f : ((↑g.a * ↑(-(f.comp g).d / (f.comp g).c) + ↑g.b)
             / (↑g.c * ↑(-(f.comp g).d / (f.comp g).c) + ↑g.d))
-            = (-f.d/f.c : EComplex) := by 
+            = (-f.d/f.c : EComplex) := by
         have h_denom_g_ne0 : g.c * (-(comp f g).d / (comp f g).c) + g.d ≠ 0 := by
             intro h
             apply h_z_pole_neq
             rw [add_eq_zero_iff_eq_neg] at h
             rw [eq_div_iff hg, mul_comm, ← neg_eq_iff_eq_neg]
             exact neg_eq_iff_eq_neg.mpr h
-        
+
         have : ((↑g.c * ↑(-(f.comp g).d / (f.comp g).c) + ↑g.d) : EComplex)
           = ↑(g.c * (-(f.comp g).d / (f.comp g).c) + g.d) := by norm_cast
         rw [this]
@@ -1611,79 +1861,78 @@ private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
         rw [this]
         rw [← EComplex.coe_div _ _ h_denom_g_ne0]
         norm_cast
-        
+
         -- 2. Solve the algebra in ℂ
         dsimp [comp]
         field_simp [hf, hg, h_comp, h_denom_g_ne0]
-        have : g.a * f.c + f.d * g.c ≠ 0 := by 
+        have : g.a * f.c + f.d * g.c ≠ 0 := by
           have : g.a * f.c + f.d * g.c = g.c * f.d + f.c * g.a := by ring
           rwa [this]
         field_simp [this]
-        have : f.c * g.a + f.d * g.c ≠ 0 := by 
+        have : f.c * g.a + f.d * g.c ≠ 0 := by
           have : f.c * g.a + f.d * g.c = g.c * f.d + f.c * g.a := by ring
           rwa [this]
         field_simp [this]
 
         have : -((f.c * g.b + f.d * g.d) * g.c) + g.d * (f.c * g.a + f.d * g.c) ≠ 0 := by
-          ring_nf 
+          ring_nf
           have : -(f.c * g.b * g.c) + f.c * g.d * g.a = f.c *(g.a*g.d - g.b*g.c) := by ring
           rw [this]
           have : g.a*g.d - g.b*g.c≠ 0 := by exact g.determinant_ne_zero
           exact mul_ne_zero hf this
-          
+
         field_simp [this]
         ring
 
       -- 3. Use the fact that w is the pole of f (hw)
       rw [h_pole_f]
-      
+
       -- 4. Apply the pole property of f
       rw [f_neg_d_div_c_infty hf]
-    
+
     rw [hR]
-    
+
   · -- Case: z is NOT a pole of comp -> LHS is finite
     have hz_not_pole_comp : z ≠ -(comp f g).d / (comp f g).c := by
         intro h; apply h_pole_comp; rw [h]; field_simp [h_comp]; ring
 
     -- w is not a pole of f
     have hw_not_pole : f.c * w + f.d ≠ 0 := by
-        intro h
-        apply h_pole_comp
-        dsimp [comp]
-        dsimp [w] at h
-        field_simp [h_not_pole_g] at h
+      intro h
+      apply h_pole_comp
+      dsimp [comp]
+      dsimp [w] at h
+      field_simp [h_not_pole_g] at h
 
-        -- Now h is exactly the expansion of comp.c * z + comp.d = 0
-        -- We use ring_nf to align the terms
-        have h_expanded : f.c * (g.a * z + g.b) + f.d * (g.c * z + g.d) = 0 := by 
-          have : z * g.c + g.d ≠ 0 := by 
-            have : z * g.c + g.d = g.c * z + g.d:= by ring
-            rwa [this]
-          field_simp [this] at h
-          ring_nf at h
-          have h_sub : f.c * g.a * z + f.c * g.b + z * g.c * f.d + g.d * f.d =0
-              := by 
-            exact h
-          ring_nf at h_sub
-          ring_nf
-          have : f.c * g.a * z + f.c * g.b + z * g.c * f.d + f.d * g.d
-              = f.c * g.a * z + f.c * g.b + z * f.d * g.c + f.d * g.d := by ring
-          rw [← this]
-          assumption 
-        
-        -- Expand the goal
+      -- Now h is exactly the expansion of comp.c * z + comp.d = 0
+      -- We use ring_nf to align the terms
+      have h_expanded : f.c * (g.a * z + g.b) + f.d * (g.c * z + g.d) = 0 := by
+        have : z * g.c + g.d ≠ 0 := by
+          have : z * g.c + g.d = g.c * z + g.d:= by ring
+          rwa [this]
+        field_simp [this] at h
+        ring_nf at h
+        have h_sub : f.c * g.a * z + f.c * g.b + z * g.c * f.d + g.d * f.d =0
+            := by
+          exact h
+        ring_nf at h_sub
         ring_nf
-        -- Expand the hypothesis
-        ring_nf at h_expanded
-
-        
-        have : f.c * g.a * z + f.c * g.b + z * f.d * g.c + f.d * g.d
-          = f.c * g.a * z + f.c * g.b + f.d * g.c * z + f.d * g.d := by ring
+        have : f.c * g.a * z + f.c * g.b + z * g.c * f.d + f.d * g.d
+            = f.c * g.a * z + f.c * g.b + z * f.d * g.c + f.d * g.d := by ring
         rw [← this]
-        
-        exact h_expanded
-        
+        assumption
+
+      -- Expand the goal
+      ring_nf
+      -- Expand the hypothesis
+      ring_nf at h_expanded
+
+      have : f.c * g.a * z + f.c * g.b + z * f.d * g.c + f.d * g.d
+        = f.c * g.a * z + f.c * g.b + f.d * g.c * z + f.d * g.d := by ring
+      rw [← this]
+
+      exact h_expanded
+
     have hz_not_pole_comp : z ≠ -(comp f g).d / (comp f g).c := by
         intro h; apply h_pole_comp; rw [h]; field_simp [h_comp]; ring
 
@@ -1693,7 +1942,7 @@ private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
     -- Prove equality of finite values
     --rw [← apply_lft_coe (comp f g) z]
     rw [@f_value_when_c_nonzero (comp f g) _ h_comp hz_not_pole_comp]
-    
+
     rw [@f_value_when_c_nonzero g _ hg hz]
 
     -- 1. Identify the complex argument on RHS with w
@@ -1703,22 +1952,22 @@ private lemma case222b {f g : LinearFractionalTransformation} {z : Complex}
           = (↑(g.a * z + g.b) / ↑(g.c * z + g.d) : EComplex) := by norm_cast
       rw [this]
       rw [← EComplex.coe_div _ _ h_not_pole_g]
-      
+
     -- 2. Substitute into the goal
     rw [h_arg]
-       
+
     -- 3. Apply the value lemma for f
     rw [@f_value_when_c_nonzero f _ hf hw]
-    
+
     -- 4. Solve the Algebra
     norm_cast
     dsimp [w, comp]
-    
+
     -- Clear all denominators.
     field_simp [h_not_pole_g, hw_not_pole, h_pole_comp]
     ring
 
-private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
+private lemma case222 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c ≠ 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
     : (comp f g) z = f (g z) := by
 
@@ -1745,13 +1994,13 @@ private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
     rw [f_infty_a_div_c h_comp]
     rw [f_infty_a_div_c hg]
 
-    -- Goal is now: ↑((f.comp g).a) / ↑((f.comp g).c) = f.apply (↑g.a / ↑g.c) 
+    -- Goal is now: ↑((f.comp g).a) / ↑((f.comp g).c) = f.apply (↑g.a / ↑g.c)
     -- 1. Simplify the argument on RHS to be a single coercion
-    
+
     have h_arg : (↑g.a / ↑g.c : EComplex) = (↑(g.a / g.c) : EComplex) := by
        norm_cast
     rw [h_arg]
-    
+
     -- 3. Now the rewrite matches perfectly
     rw [f_value_when_c_nonzero hf h_g_inf_not_pole]
     dsimp [comp]
@@ -1767,7 +2016,7 @@ private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
     rw [this]
 
     have : (↑(f.a * (g.a / g.c) + f.b) / ↑(f.c * (g.a / g.c) + f.d) : EComplex)
-      =  ↑((f.a * (g.a / g.c) + f.b) / (f.c * (g.a / g.c) + f.d)) := by 
+      =  ↑((f.a * (g.a / g.c) + f.b) / (f.c * (g.a / g.c) + f.d)) := by
       have h_denom_f_ne_zero : f.c * (g.a / g.c) + f.d ≠ 0 := by
         intro h
         have h_eq : g.a / g.c = -f.d / f.c := by
@@ -1780,17 +2029,17 @@ private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
     rw [this]
     norm_cast   -- reduce to finite complex number
     field_simp [hf, hg, h_comp]
-    
+
   | some z =>
     -- Case z is finite
     -- Split on whether z is the pole of g
-    have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by 
+    have h_gcfd : g.c * f.d + f.c * g.a ≠ 0 := by
       -- Unfold the definition of comp.c
       dsimp [comp] at h_comp
       -- Rearrange terms to match the goal
       -- h_comp is f.c * g.a + f.d * g.c
       rw [add_comm, mul_comm g.c]
-      exact h_comp     
+      exact h_comp
 
     by_cases h_pole_g : g.c * z + g.d = 0
     · -- SubCase 1:
@@ -1799,8 +2048,6 @@ private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
     · -- Subcase 2
       --  z is NOT the pole of g
       exact case222b hf hg h_comp h_pole_g
-     
-
 
 
 /-!
@@ -1809,7 +2056,7 @@ private lemma case222 {f g : LinearFractionalTransformation} {z : EComplex}
 
   we divide into cases based on whether f.c and g.c are zero or not.
 -/
-theorem comp_equivalent (z : EComplex) (f g : LinearFractionalTransformation)
+theorem comp_equivalent (z : EComplex) (f g : LinearFracTrans)
   : (comp f g) z = f (g z) := by
 
   by_cases hf : f.c = 0  -- Split on whether f.c is zero
@@ -1850,21 +2097,19 @@ theorem comp_equivalent (z : EComplex) (f g : LinearFractionalTransformation)
 
 -- The identity linear fractional transformation is the identity element
 -- for composition
-lemma lft_one_mul (f : LinearFractionalTransformation)
+lemma lft_one_mul (f : LinearFracTrans)
   : comp id f = f := by
   unfold comp
   ext <;>
-  · simp [LinearFractionalTransformation.id]
+  · simp [LinearFracTrans.id]
 
-
-lemma lft_mul_one (f : LinearFractionalTransformation)
-    : comp f (LinearFractionalTransformation.id) = f := by
+lemma lft_mul_one (f : LinearFracTrans)
+    : comp f (LinearFracTrans.id) = f := by
  unfold comp
  ext <;>
- · simp [LinearFractionalTransformation.id]
+ · simp [LinearFracTrans.id]
 
-
-lemma lft_mul_assoc (f g h : LinearFractionalTransformation)
+lemma lft_mul_assoc (f g h : LinearFracTrans)
   : (comp (comp f g) h) = (comp f (comp g h)) := by
  ext <;>
  · unfold comp
@@ -1872,8 +2117,8 @@ lemma lft_mul_assoc (f g h : LinearFractionalTransformation)
    ring
 
 
-def inv (f : LinearFractionalTransformation)
-    : LinearFractionalTransformation where
+def inv (f : LinearFracTrans)
+    : LinearFracTrans where
   a := f.d/(f.a * f.d - f.b * f.c)
   b := -f.b/(f.a * f.d - f.b * f.c)
   c := -f.c/(f.a * f.d - f.b * f.c)
@@ -1893,52 +2138,52 @@ def inv (f : LinearFractionalTransformation)
 
 -- The inverse of a linear fractional transformation f, composed with f,
 -- gives the identity transformation
-lemma lft_mul_left_inv (f : LinearFractionalTransformation)
+lemma lft_mul_left_inv (f : LinearFracTrans)
    : comp (inv f) f = id := by
- unfold inv
- ext
- · unfold comp
-   simp
-   calc
-  _ = (f.d * f.a + (-f.b) * f.c) / (f.a * f.d - f.b * f.c) := by ring
-  _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
-  _ = 1 := by
-    apply div_self
-    exact f.determinant_ne_zero
- · unfold comp
-   simp
-   calc
-    _ = (f.d * f.b -f.d * f.b) / (f.a * f.d - f.b * f.c) := by ring
+  unfold inv
+  ext
+  · unfold comp
+    simp
+    calc
+    _ = (f.d * f.a + (-f.b) * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
+  · unfold comp
+    simp
+    calc
+      _ = (f.d * f.b -f.d * f.b) / (f.a * f.d - f.b * f.c) := by ring
+      _ = 0 := by ring
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.c -f.a * f.c) / (f.a * f.d - f.b * f.c) := by ring
     _ = 0 := by ring
- · unfold comp
-   simp
-   calc
-   _ = (f.a * f.c -f.a * f.c) / (f.a * f.d - f.b * f.c) := by ring
-   _ = 0 := by ring
- · unfold comp
-   simp
-   calc
-   _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
-   _ = 1 := by
-    apply div_self
-    exact f.determinant_ne_zero
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
 
 
 -- The set of linear fractional transformations forms a group under composition
-instance : Group (LinearFractionalTransformation) where
+instance : Group (LinearFracTrans) where
   mul := comp
   mul_assoc := by
     intro f g h
     dsimp [·*·]
     exact lft_mul_assoc f g h
-  one := LinearFractionalTransformation.id
+  one := LinearFracTrans.id
   one_mul := by
     dsimp [·*·]
     apply lft_one_mul
   mul_one := by
     dsimp [·*·]
     apply lft_mul_one
-  inv := LinearFractionalTransformation.inv
+  inv := LinearFracTrans.inv
   inv_mul_cancel := by
     dsimp [·*·]
     apply lft_mul_left_inv
@@ -1946,11 +2191,11 @@ instance : Group (LinearFractionalTransformation) where
 
 -- Define the scalar multiplication (Action)
 -- This enables the usage of `f • z` instead of `f z`
-instance : SMul LinearFractionalTransformation EComplex where
+instance : SMul LinearFracTrans EComplex where
   smul f z := f z
 
 -- Register the Group Action
-instance : MulAction LinearFractionalTransformation EComplex where
+instance : MulAction LinearFracTrans EComplex where
   -- Proof that 1 • z = z
   one_smul := id_apply
 
@@ -1959,16 +2204,16 @@ instance : MulAction LinearFractionalTransformation EComplex where
   mul_smul f g z := comp_equivalent z f g
 
 -- check the newly defined instances
--- #synth Group LinearFractionalTransformation
--- #synth SMul LinearFractionalTransformation EComplex
--- #synth MulAction LinearFractionalTransformation EComplex
+-- #synth Group LinearFracTrans
+-- #synth SMul LinearFracTrans EComplex
+-- #synth MulAction LinearFracTrans EComplex
 
 
-example (f : LinearFractionalTransformation) (z : EComplex) :
+example (f : LinearFracTrans) (z : EComplex) :
   f • z = f z := rfl
 
 -- Example of using group action theorem from Mathlib
-example (f : LinearFractionalTransformation) (z : EComplex) :
+example (f : LinearFracTrans) (z : EComplex) :
   f⁻¹ • f • z = z := by
   -- Distribute action: (f * f⁻¹) • z  ->  f • (f⁻¹ • z)
   rw [← mul_smul]
@@ -1982,8 +2227,70 @@ example (z : EComplex) :
   id • z = z := by
   apply one_smul
 
-open EComplex
 
 
 
-end LinearFractionalTransformation
+end LinearFracTrans
+
+
+section cross_ratio
+
+
+
+
+
+/-
+Definition of the cross ratio of four extended complex numbers.
+It follows the standard formula when z1, z2, z3 are finite, and special limiting formulas when one of them is infinity.
+-/
+open Complex
+
+namespace EComplex
+
+/-
+Definition of cross ratio
+-/
+def cross_ratio (z0 z1 z2 z3 : EComplex) : EComplex :=
+  match z1, z2, z3 with
+  | some z1, some z2, some z3 =>
+    match z0 with
+    | some z0 => (z0 - z1) / (z0 - z3) * ((z2 - z3) / (z2 - z1))
+    | none => (z2 - z3) / (z2 - z1)
+  | none, some z2, some z3 =>
+    (z2 - z3) / (z0 - z3)
+  | some z1, none, some z3 =>
+    (z0 - z1) / (z0 - z3)
+  | some z1, some z2, none =>
+    (z0 - z1) / (z2 - z1)
+  | _, _, _ => 0  -- junk value
+
+/-
+Verification theorems for the cross ratio definition, corresponding to the cases specified by the user.
+These theorems confirm that the definition matches the standard formulas when the arguments are finite or one of them is infinity.
+-/
+
+theorem cross_ratio_finite (z0 z1 z2 z3 : ℂ) :
+  cross_ratio z0 z1 z2 z3 = (z0 - z1) / (z0 - z3) * ((z2 - z3) / (z2 - z1)) := by
+  rfl
+
+theorem cross_ratio_z1_infty (z0 z2 z3 : ℂ) :
+  cross_ratio z0 EComplex.infty z2 z3 = (z2 - z3) / (z0 - z3) := by
+  rfl
+
+theorem cross_ratio_z2_infty (z0 z1 z3 : ℂ) :
+  cross_ratio z0 z1 EComplex.infty z3 = (z0 - z1) / (z0 - z3) := by
+  rfl
+
+theorem cross_ratio_z3_infty (z0 z1 z2 : ℂ) :
+  cross_ratio z0 z1 z2 EComplex.infty = (z0 - z1) / (z2 - z1) := by
+  rfl
+
+
+
+
+end EComplex
+
+
+end cross_ratio
+
+end  -- noncomputable section
