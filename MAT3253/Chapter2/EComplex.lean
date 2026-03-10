@@ -2189,6 +2189,426 @@ instance : Group (LinearFracTrans) where
     apply lft_mul_left_inv
 
 
+/-
+Lemma preparing for prove exist LFT mapping three distinct point to three other distinct point
+-/
+
+  --construct lft, s.t. z1 ↦ 0 , z2 ↦ 1 ,z3 ↦ ∞
+def construct_lft_to0_1_infty (z1 z2 z3 : EComplex)
+  (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1) : LinearFracTrans :=
+  match z1 , z2 , z3 with
+  | ∞ , some z2 , some z3 => { a := 0 , b := z2 - z3, c := 1 , d := -z3 , determinant_ne_zero := by {
+      simp only [mul_neg, zero_mul, neg_zero, mul_one, zero_sub, neg_sub, ne_eq]
+      push_neg
+      rcases hz with ⟨h1,h2,h3⟩
+      apply sub_ne_zero.2
+      exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h2))
+       }}
+  | some z1 , ∞ , some z3 => {a := 1 , b := - z1 , c := 1 , d := - z3 , determinant_ne_zero := by {
+    simp only [mul_neg, one_mul, mul_one, sub_neg_eq_add, ne_eq]
+    push_neg
+    rcases hz with ⟨h1,h2,h3⟩
+    rw [neg_add_eq_sub]
+    apply sub_ne_zero.2
+    exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+    }}
+  | some z1 ,some z2 , ∞ => {a := 1 , b := - z1 , c := 0 , d :=  z2 - z1 , determinant_ne_zero := by {
+    simp only [one_mul, mul_zero, sub_zero, ne_eq]
+    push_neg
+    apply sub_ne_zero.2
+    rcases hz with ⟨h1,h2,h3⟩
+    exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h1))
+  }}
+  | some z1 , some z2 , some z3 => {a := z2 - z3, b :=   -z1 * (z2 - z3) , c := z2 - z1, d :=  -z3 * (z2 -z1) , determinant_ne_zero := by {
+    simp only [neg_mul, mul_neg, sub_neg_eq_add, ne_eq]
+    push_neg
+    rcases hz with ⟨h1,h2,h3⟩
+    have hsimp : -((z2 - z3) * (z3 * (z2 - z1))) + z1 * (z2 - z3) * (z2 - z1)  = (z1 - z2) * (z2 - z3) * (z3 - z1) := by ring
+    rw [hsimp]
+    have h12 : z1 - z2 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h1 (congrArg some a)
+    have h23 : z2 - z3 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h2 (congrArg some a)
+    have h31 : z3 - z1 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h3 (congrArg some a)
+    apply mul_ne_zero
+    apply mul_ne_zero
+    assumption
+    assumption
+    assumption
+  }}
+
+ -- proving that constructed lft actually mapping z1 z2 z3 to 0 1 ∞
+theorem constructlft_map_to_01infty (z1 z2 z3 : EComplex) (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1) :
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z1 = some 0 ∧
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z2 = some 1 ∧
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z3 = ∞ := by
+    let f := construct_lft_to0_1_infty z1 z2 z3 hz
+    have hf : construct_lft_to0_1_infty z1 z2 z3 hz = f := by rfl
+    rw [hf]
+    cases z1 with
+    | none => {
+      cases z2 with
+      | none => {
+        cases z3 with
+        | none => {
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+      }
+      | some z2 => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          simp only [ne_eq, one_ne_zero, not_false_eq_true, f_infty_a_div_c]
+          unfold LinearFracTrans.apply
+          simp only [one_ne_zero, ↓reduceIte, neg_neg, div_one, zero_mul, zero_add, one_mul,
+            and_true]
+          constructor
+          change EComplex.div ↑0 ↑1 = some 0
+          unfold EComplex.div
+          unfold EComplex.inv
+          simp only [one_ne_zero, ↓reduceIte, inv_one]
+          change EComplex.mul ↑0 ↑1 = some 0
+          unfold EComplex.mul
+          simp only [mul_one]
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          exact (congrArg EComplex.some ∘ congrArg (@OfNat.ofNat ℂ 0)) rfl
+          split_ifs
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          contradiction
+          rw [← sub_eq_add_neg]
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          have fraction_eq1 : (z2 - z3) / (z2 - z3) = 1 := by {
+            apply div_self
+            (expose_names; exact sub_ne_zero_of_ne h)
+          }
+          rw [fraction_eq1]
+        }
+      }
+    }
+    | some z1 => {
+      cases z2 with
+      | none => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          simp only [ne_eq, one_ne_zero, not_false_eq_true, f_infty_a_div_c]
+          unfold LinearFracTrans.apply
+          simp only [one_ne_zero, ↓reduceIte, neg_neg, div_one, one_mul, add_neg_cancel, zero_div,
+            ite_eq_right_iff, reduceCtorEq, imp_false, and_true]
+          constructor
+          push_neg
+          exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          change EComplex.div ↑1 ↑1 = some 1
+          unfold EComplex.div
+          unfold EComplex.inv
+          simp only [one_ne_zero, ↓reduceIte, inv_one]
+          change EComplex.mul ↑1 ↑1 = some 1
+          unfold EComplex.mul
+          simp
+          rfl
+        }
+      }
+      | some z2 => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          have h12_not_eql : z2 - z1 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          unfold construct_lft_to0_1_infty
+          simp only [f_infty_infty, and_true]
+          unfold LinearFracTrans.apply
+          simp
+          constructor
+          field_simp
+          simp
+          field_simp
+          rw [← sub_eq_add_neg]
+          have fraction_eq1 : (z2 - z1) / (z2 - z1) = 1 := by {
+            exact (div_eq_one_iff_eq h12_not_eql).mpr rfl
+          }
+          rw [fraction_eq1]
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          unfold LinearFracTrans.apply
+          have h12 : z1 ≠ z2 := by exact fun a => h1 (congrArg Option.some a)
+          have h23 : z2 ≠ z3 := by exact fun a => h2 (congrArg Option.some a)
+          have h13 : z1 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          simp
+          have h12_not0 : z2 -z1 ≠ 0 := by exact sub_ne_zero_of_ne (_root_.id (Ne.symm h12))
+          have h23_not0 : z2 -z3 ≠ 0 := by exact sub_ne_zero_of_ne h23
+          have h31_not0 : z3 -z1 ≠ 0 := by exact sub_ne_zero_of_ne (_root_.id (Ne.symm h13))
+          simp [h12_not0,h23,h13]
+          constructor
+          have h123 : (z2 - z3) * z1 + -(z1 * (z2 - z3)) = 0 := by ring
+          rw [h123,zero_div]
+          congr 1
+          field_simp
+          rw [show z2 + -z1 = z2 - z1 by ring, show z2 + -z3 = z2 - z3 by ring]
+          exact mul_div_cancel_left₀ (z2 - z1) h23_not0
+        }
+      }
+    }
+
+ -- prove inverse lft map 0,1,∞ to w1 w2 w3
+theorem proof_inv_constructlft_map_to_01infty (w1 w2 w3 : EComplex) (hw : w1 ≠ w2 ∧ w2 ≠ w3 ∧ w3 ≠ w1) :
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) (some 0) = w1 ∧
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) (some 1) = w2 ∧
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) ∞ = w3 := by
+    let g := LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw)
+    have hg : LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) = g := by rfl
+    unfold LinearFracTrans.apply
+    unfold LinearFracTrans.inv
+    unfold construct_lft_to0_1_infty
+    rcases hw with ⟨h1,h2,h3⟩
+    cases w1 with
+    | none => {
+      cases w2 with
+      | none => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          contradiction
+        }
+      }
+      | some w2 => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          simp only [mul_neg, zero_mul, neg_zero, mul_one, zero_sub, neg_sub, div_eq_zero_iff,
+            neg_eq_zero, one_ne_zero, false_or, zero_div, div_zero, mul_zero, add_zero, ↓reduceIte,
+            ite_eq_right_iff, reduceCtorEq, imp_false]
+          constructor
+          push_neg
+          exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          constructor
+          have h32_not0 : w3 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          simp [h32_not0]
+          congr 1
+          field_simp [h32_not0]
+          ring
+          have h32_not0 : w3 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          simp [h32_not0]
+          congr 1
+          field_simp [h32_not0]
+        }
+      }
+    }
+    | some w1 => {
+      cases w2 with
+      | none => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          simp only [mul_neg, one_mul, mul_one, sub_neg_eq_add, div_eq_zero_iff, neg_eq_zero,
+            one_ne_zero, false_or, one_div, div_inv_eq_mul, mul_zero, neg_neg, zero_add]
+          constructor
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          push_neg
+          field_simp
+          exact zero_ne_one' ℂ
+          constructor
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          field_simp
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          congr 1
+          field_simp
+        }
+      }
+      | some w2 => {
+        cases w3 with
+        | none => {
+          simp
+          constructor
+          congr 1
+          have w21_not0 : (w2 - w1) ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          congr 1
+          have w21_not0 : (w2 - w1) ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          ring
+        }
+        | some w3 => {
+          simp only [neg_sub, neg_mul, mul_neg, sub_neg_eq_add, div_eq_zero_iff, mul_zero, neg_neg,
+            zero_add, mul_one]
+          have h12_not0 : w1 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some a)
+          }
+          have h23_not0 : w2 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some a)
+          }
+          have h31_not0 : w3 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some a)
+          }
+          have neg_h13_not0 : -w3 + w1 ≠ 0 := by {
+              rw [neg_add_eq_sub]
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          have if_condiction2_false : -((w2 - w3) * (w3 * (w2 - w1))) + w1 * (w2 - w3) * (w2 - w1) ≠ 0 := by {
+            intro h
+            have factored : -((w2 - w3) * (w3 * (w2 - w1))) + w1 * (w2 - w3) * (w2 - w1)
+              = (w2 - w3) * (w2 - w1) * (w1 - w3) := by ring
+            rw [factored] at h
+            simp only [mul_eq_zero] at h
+            rcases h with htwo | h13
+            rcases htwo with h23 | h13
+            contradiction
+            have contra_cond : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            contradiction
+            have contra_cond : w1 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            contradiction
+          }
+          simp [h12_not0, if_condiction2_false]
+          constructor
+          rw [if_neg]
+          · {
+            congr 1
+            have h23_not0 : w2 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some a)
+            }
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp [h23_not0,h21_not0]
+            }
+          · {
+            push_neg
+            field_simp
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            intro h
+            field_simp at h
+            rw [zero_mul] at h
+            rw [zero_eq_neg] at h
+            contradiction
+            }
+          constructor
+          rw [if_neg]
+          · {
+            congr 1
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            have h13_not0 : w1 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            simp
+            field_simp
+            ring
+            }
+          · {
+            push_neg
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            rw [neg_div']
+            intro h
+            field_simp at h
+            rw [neg_sub,eq_sub_iff_add_eq,sub_add_cancel] at h
+            exact Ne.elim h3 (congrArg some (_root_.id (Eq.symm h)))
+            }
+          congr 1
+          have h21_not0 : w2 - w1 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          ring
+        }
+      }
+    }
+
+
+/-
+Lemma preparing for prove exist LFT mapping three distinct point to three other distinct point
+-/
+
+
+
+/-
+  Given any three distinct points z1, z2 and z3 and any three distinct
+points w1, w2 and w3, all in the extended complex plane EComplex , there is a linear
+fractional transformation that maps z1 to w1, z2 to w2, and z3 to w3
+-/
+
+theorem exist_LFT_mapping_three_point (z1 z2 z3 w1 w2 w3 : EComplex)
+   ( hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1 )
+   ( hw : w1 ≠ w2 ∧ w2 ≠ w3 ∧ w3 ≠ w1 ) :
+ ∃ f : LinearFracTrans ,
+   f z1 = w1 ∧
+   f z2 = w2 ∧
+   f z3 = w3 := by
+   let fz := construct_lft_to0_1_infty z1 z2 z3 hz
+   let gw := construct_lft_to0_1_infty w1 w2 w3 hw
+   let compose_lft := comp (gw.inv) fz
+   use compose_lft
+   have ⟨hf1, hf2, hf3⟩ := constructlft_map_to_01infty z1 z2 z3 hz
+   unfold compose_lft
+   rw [comp_equivalent,comp_equivalent,comp_equivalent]
+   have hfz_maps := constructlft_map_to_01infty z1 z2 z3 hz
+   unfold fz
+   rcases hfz_maps with ⟨hz1,hz2,hz3⟩
+   rw [hz1,hz2,hz3]
+   have hgz_maps := proof_inv_constructlft_map_to_01infty w1 w2 w3 hw
+   rcases hgz_maps with ⟨hw1,hw2,hw3⟩
+   unfold gw
+   rw [hw1,hw2,hw3]
+   trivial
+
 -- Define the scalar multiplication (Action)
 -- This enables the usage of `f • z` instead of `f z`
 instance : SMul LinearFracTrans EComplex where
