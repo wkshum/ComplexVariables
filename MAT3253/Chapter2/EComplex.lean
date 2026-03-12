@@ -472,6 +472,8 @@ def apply (f : LinearFracTrans) (z : EComplex) : EComplex :=
           else some ((f.a * z + f.b) / (f.c * z + f.d))
         | ∞ => some (f.a / f.c)
 
+/-- The pole of an LFT with c ≠ 0 is -d/c -/
+def pole (f : LinearFracTrans) (hc : f.c ≠ 0) : ℂ := -f.d / f.c
 
 -- testing the apply function
 def f_test : LinearFracTrans :=
@@ -2609,6 +2611,8 @@ theorem exist_LFT_mapping_three_point (z1 z2 z3 w1 w2 w3 : EComplex)
    rw [hw1,hw2,hw3]
    trivial
 
+
+
 -- Define the scalar multiplication (Action)
 -- This enables the usage of `f • z` instead of `f z`
 instance : SMul LinearFracTrans EComplex where
@@ -2627,6 +2631,406 @@ instance : MulAction LinearFracTrans EComplex where
 -- #synth Group LinearFracTrans
 -- #synth SMul LinearFracTrans EComplex
 -- #synth MulAction LinearFracTrans EComplex
+
+
+--Define when two LFTs have proportional coefficients
+
+def Proportional (f1 f2 : LinearFracTrans) : Prop :=
+  ∃ (k : ℂ) , k ≠ 0 ∧
+    f2.a = k * f1.a ∧
+    f2.b = k * f1.b ∧
+    f2.c = k * f1.c ∧
+    f2.d = k * f1.d
+
+--Define when two LFTs give the same result for all inputs:
+
+def FunEq (f1 f2 : LinearFracTrans) : Prop :=
+  ∀ z : EComplex, f1 z = f2 z
+
+-- The main theorem: functional equality ↔ proportionality
+--Proportinal to FunEq
+theorem proportional2FunEq (f1 f2 : LinearFracTrans) :
+  f1.Proportional f2  →   f1.FunEq f2 := by
+    intro ⟨k, hk_ne, ha, hb, hc, hd⟩ z
+    cases z with
+    | none => {
+      unfold LinearFracTrans.apply
+      simp only
+      split_ifs with h1c_eq0 h2c_neq0 h2c_eq0
+      rfl
+      push_neg at h2c_neq0
+      rw [h1c_eq0,mul_zero] at hc
+      contradiction
+      push_neg at h1c_eq0
+      rw [h2c_eq0] at hc
+      rw[zero_eq_mul] at hc
+      rcases hc with h1 | h2
+      contradiction
+      contradiction
+      congr 1
+      rw [ha,hc]
+      field_simp
+    }
+    | some z => {
+      unfold LinearFracTrans.apply
+      simp only
+      have f1_det : f1.a * f1.d - f1.b * f1.c ≠ 0 := by exact f1.determinant_ne_zero
+      have f2_det : f2.a * f2.d - f2.b * f2.c ≠ 0 := by exact f2.determinant_ne_zero
+      split_ifs with h1c_eq0 h2c_eq0 hcd hcdeq h2c_eq02 h1c_eq02 h2c_eq03 hcd2
+      congr 1
+      rw[ha,hb,hd]
+      field_simp
+      push_neg at h2c_eq0
+      rw [h1c_eq0,mul_zero] at hc
+      contradiction
+      congr 1
+      push_neg at hcd h2c_eq0
+      field_simp
+      rw [h1c_eq0,mul_zero] at hc
+      rw [hc,mul_zero,zero_add]
+      rw[h1c_eq0,mul_zero,sub_zero] at f1_det
+      rw[hc,mul_zero,sub_zero] at f2_det
+      have f1d_neq0 : f1.d ≠ 0 := by exact EComplex.coe_ne_coe_iff.mp fun a ↦ h2c_eq0 hc
+      have f2d_neq0 : f2.d ≠ 0 := by exact EComplex.coe_ne_coe_iff.mp fun a ↦ h2c_eq0 hc
+      field_simp
+      rw [hb,ha,hd]
+      ring
+      push_neg at h1c_eq0
+      rw[h2c_eq02,zero_eq_mul] at hc
+      rcases hc
+      contradiction
+      contradiction
+      trivial
+      push_neg at h1c_eq0 h2c_eq02 h1c_eq02
+      rw [hd,hc] at h1c_eq02
+      field_simp at h1c_eq02
+      rw[neg_div'] at h1c_eq02
+      contradiction
+      rw[h2c_eq03,zero_eq_mul] at hc
+      push_neg at h1c_eq0
+      rcases hc
+      contradiction
+      contradiction
+      push_neg at hcdeq
+      rw[hc,hd] at hcd2
+      field_simp at hcd2 hcdeq
+      push_neg at h1c_eq0
+      rw[neg_div'] at hcdeq
+      rw[← propext (eq_div_iff_mul_eq h1c_eq0)] at hcd2
+      contradiction
+      congr 1
+      push_neg at h1c_eq0 hcdeq h2c_eq03 hcd2
+      rw[ha,hb,hc,hd]
+      field_simp
+    }
+
+/-If two LFTs agree everywhere, they agree on whether c = 0-/
+lemma c_zero_iff_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2) :
+    f1.c = 0 ↔ f2.c = 0 := by
+    have h_inf := h none
+    constructor
+    · {
+      intro hc1
+      simp [LinearFracTrans.apply, hc1] at h_inf
+      exact h_inf
+      }
+    · {
+      intro hc2
+      simp [LinearFracTrans.apply,hc2] at h_inf
+      exact h_inf
+      }
+
+/-From FunEq at ∞ when both c ≠ 0 : a1/c1 = a2/c2 -/
+lemma ratio_a_c_of_funEq_inf (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) :
+    f1.a / f1.c = f2.a / f2.c := by
+  have h_inf := h none
+  simp[LinearFracTrans.apply,hc1,hc2] at h_inf
+  exact (EComplex.some_eq_iff (f1.a / f1.c) (f2.a / f2.c)).mp h_inf
+
+/-From FunEq at 0 : b1/d1 = b2/d2-/
+lemma ratio_b_d_of_funEq_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hd1 : f1.d ≠ 0) (hd2 : f2.d ≠ 0) :
+    f1.b / f1.d = f2.b / f2.d := by
+  have h_zero := h (some 0)
+  simp [LinearFracTrans.apply] at h_zero
+  by_cases hf1c : f1.c =0
+  · {
+    have hf2c : f2.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mp hf1c
+    simp[hf1c,hf2c] at h_zero
+    exact (EComplex.some_eq_iff (f1.b / f1.d) (f2.b / f2.d)).mp h_zero
+    }
+  · {
+    push_neg at hf1c
+    have hf2c : f2.c ≠ 0 := by {
+      intro hcon
+      have hf1cc : f1.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mpr hcon
+      contradiction
+    }
+    simp [hf1c,hf2c] at h_zero
+    have hcd1_neq0 : 0 ≠ -f1.d / f1.c := Ne.symm (div_ne_zero (neg_ne_zero.mpr hd1) hf1c)
+    have hcd2_neq0 : 0 ≠ -f2.d / f2.c := Ne.symm (div_ne_zero (neg_ne_zero.mpr hd2) hf2c)
+    simp [hcd1_neq0,hcd2_neq0] at h_zero
+    exact (EComplex.some_eq_iff (f1.b / f1.d) (f2.b / f2.d)).mp h_zero
+    }
+
+/- From FunEq at 1-/
+lemma ratio_at_one_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hd1 : f1.c + f1.d ≠ 0) (hd2 : f2.c + f2.d ≠ 0) :
+    (f1.a + f1.b) / (f1.c + f1.d) = (f2.a + f2.b) / (f2.c + f2.d) := by
+  have h_one := h (some 1)
+  simp [LinearFracTrans.apply] at h_one
+  by_cases hf1c : f1.c = 0
+  · {
+    have hf2c : f2.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mp hf1c
+    simp [hf1c,hf2c] at h_one
+    rw[hf1c,hf2c,zero_add,zero_add]
+    have h1 := Option.some_injective ℂ h_one
+    simp only [← add_div] at h1
+    exact h1
+    }
+  · {
+    push_neg at hf1c
+    have hf2c : f2.c ≠ 0 := by {
+      intro hcc
+      have hf1cc : f1.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mpr hcc
+      contradiction
+    }
+    simp [hf1c,hf2c] at h_one
+    have h1 : 1 ≠ -f1.d / f1.c := fun heq => hd1 (by field_simp [hf1c] at heq; rw [heq]; ring)
+    have h2 : 1 ≠ -f2.d / f2.c := fun heq => hd2 (by field_simp [hf2c] at heq; rw [heq]; ring)
+    simp only [if_neg h1, if_neg h2] at h_one
+    have h11 := Option.some_injective ℂ h_one
+    exact h11
+    }
+
+/-- If two LFTs are FunEq and both have c ≠ 0, they have the same pole -/
+lemma pole_eq_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) :
+    f1.pole hc1 = f2.pole hc2 := by
+  have h_pole := h (some (-f1.d/f1.c))
+  simp only [apply] at h_pole
+  have f1_pole : f1.c * (-f1.d / f1.c) + f1.d = 0 := by {
+    field_simp
+    ring
+  }
+  simp[hc1,hc2] at h_pole
+  unfold pole
+  exact
+    (EComplex.some_eq_iff (-f1.d / f1.c) (-f2.d / f2.c)).mp
+      (congrArg EComplex.Complex.toEComplex h_pole)
+
+/-From equal poles,derive d2 = k * d1 where k = c2/c1-/
+
+lemma pro_d_of_pole_eq (f1 f2 : LinearFracTrans)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0)
+    (h_pole : f1.pole hc1 = f2.pole hc2) :
+    f2.d = (f2.c / f1.c) * f1.d := by
+  simp only [pole] at h_pole
+  have h : f1.d / f1.c = f2.d / f2.c := by
+    field_simp at h_pole
+    field_simp
+    simp at h_pole
+    exact h_pole
+  field_simp at h
+  field_simp
+  rw [Eq.comm,mul_comm,mul_comm f2.d f1.c]
+  exact h
+
+
+
+/-Main case when both c ≠ 0-/
+lemma proportional_of_c_ne_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) : f1.Proportional f2 := by
+  use f2.c / f1.c
+  let k := f2.c / f1.c
+  have h1 : f2.c / f1.c ≠ 0 := by exact div_ne_zero hc2 hc1
+  constructor
+  exact h1
+  have pro_a : f2.a = k * f1.a := by {
+    have h_ac := ratio_a_c_of_funEq_inf f1 f2 h hc1 hc2
+    unfold k
+    field_simp at h_ac ⊢
+    exact
+      (EComplex.some_eq_iff (f1.c * f2.a) (f1.a * f2.c)).mp
+        (congrArg EComplex.Complex.toEComplex (_root_.id (Eq.symm h_ac)))
+  }
+
+  have pro_c : f2.c = k * f1.c := by {
+    unfold k
+    field_simp
+  }
+
+  have pro_d : f2.d = k * f1.d := by {
+    have h_same_pole := pole_eq_of_funEq f1 f2 h hc1 hc2
+    exact pro_d_of_pole_eq f1 f2 hc1 hc2 h_same_pole
+  }
+
+  have pro_b : f2.b = k * f1.b := by {
+    by_cases hd1 : f1.d = 0
+    --cases d1 = 0
+    · {
+      have hd2 : f2.d =0 := by simp [pro_d,hd1]
+      have h_one := h (some 1)
+      simp only [apply] at h_one
+      have hcd1 : 1 ≠  -f1.d / f1.c := by simp [hd1]
+      have hcd2 : 1 ≠  -f2.d / f2.c := by simp [hd2]
+      simp [ hc1,hc2,hcd1,hcd2] at h_one
+      have h_eq := Option.some_injective ℂ h_one
+      simp [hd1,hd2] at h_eq
+      have h_cross : (f1.a + f1.b) * f2.c = (f2.a + f2.b) * f1.c := by
+        field_simp [hc1,hc2] at h_eq
+        rw[mul_comm (f2.a + f2.b) f1.c]
+        exact h_eq
+      field_simp [hc1] at h_cross ⊢
+      rw [pro_a,pro_c] at h_cross
+      unfold k at h_cross
+      field_simp at h_cross
+      rw [add_mul,add_left_cancel_iff] at h_cross
+      unfold k
+      field_simp
+      rw[Eq.comm,mul_comm f2.b _]
+      exact h_cross
+      }
+    --cases d1 ≠ 0
+    · {
+      push_neg at hd1
+      have hk : f2.c / f1.c ≠ 0 := div_ne_zero hc2 hc1
+      have hd2 : f2.d ≠ 0 := by
+        rw [pro_d]
+        exact mul_ne_zero hk hd1
+      have h_zero := h (some 0)
+      simp only [apply] at h_zero
+      have hz1 : 0 ≠  -f1.d / f1.c := by {
+        by_contra h
+        field_simp at h
+        rw[zero_mul,eq_neg_iff_add_eq_zero,zero_add] at h
+        contradiction
+      }
+      have hz2 : 0 ≠  -f2.d / f2.c := by {
+        by_contra h
+        field_simp at h
+        rw[zero_mul,eq_neg_iff_add_eq_zero,zero_add] at h
+        contradiction
+      }
+      simp [hc1,hc2,hz1,hz2] at h_zero
+      have h_bd := Option.some_injective ℂ h_zero
+      have h_cross : f1.b * f2.d = f2.b * f1.d := by
+        field_simp [hd1, hd2] at h_bd
+        rw[mul_comm f1.d _] at h_bd
+        exact h_bd
+      rw [pro_d] at h_cross
+      field_simp [hd1] at h_cross ⊢
+      rw[Eq.comm]
+      exact h_cross
+      }
+  }
+  unfold k at pro_a pro_b pro_c pro_d
+  constructor
+  exact pro_a
+  constructor
+  exact pro_b
+  constructor
+  exact pro_c
+  exact pro_d
+
+/-Main case when both c = 0-/
+lemma proportional_of_c_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c = 0) (hc2 : f2.c = 0) : f1.Proportional f2 := by
+  have hd1 : f1.d ≠ 0 := by
+    intro hd
+    have := f1.determinant_ne_zero
+    simp [hc1,hd] at this
+  have hd2 : f2.d ≠ 0 := by
+    intro hd
+    have := f2.determinant_ne_zero
+    simp [hc2,hd] at this
+  let k := f2.d / f1.d
+  have hk : k ≠ 0 := div_ne_zero hd2 hd1
+  use k
+  have pro_a : f2.a = k * f1.a := by {
+    have h_zero := h (some 0)
+    simp only [apply, hc1, hc2] at h_zero
+    simp at h_zero
+    have h_bd : f1.b / f1.d = f2.b / f2.d := Option.some_injective ℂ h_zero
+    have h_one := h (some 1)
+    simp only [apply, hc1, hc2] at h_one
+    simp at h_one
+    have h_sum : (f1.a + f1.b) / f1.d = (f2.a + f2.b) / f2.d := by {
+      have honeone := Option.some_injective ℂ h_one
+      field_simp at honeone
+      field_simp
+      rw [add_mul,mul_add] at honeone
+      ring_nf
+      exact honeone
+    }
+    have h_ad : f1.a / f1.d = f2.a / f2.d := by {
+      have h1 : (f1.a + f1.b) / f1.d - f1.b / f1.d = (f2.a + f2.b) / f2.d - f2.b / f2.d := by
+        rw [h_sum, h_bd]
+      simp only [add_div, add_sub_cancel_right] at h1
+      exact h1
+    }
+    field_simp [hd1]
+    have h_cross : f1.a * f2.d = f2.a * f1.d := by
+      field_simp [hd1, hd2] at h_ad
+      rw[mul_comm f1.d _] at h_ad
+      exact h_ad
+    unfold k
+    field_simp
+    rw[Eq.comm,mul_comm f2.d _ ]
+    exact h_cross
+  }
+  have pro_b : f2.b = k * f1.b := by {
+    have h_zero := h (some 0)
+    simp only [apply, hc1, hc2] at h_zero
+    simp at h_zero
+    have h_bd := Option.some_injective ℂ h_zero
+    have h_bd_cross : f1.b * f2.d = f2.b * f1.d := by
+      field_simp [hd1, hd2] at h_bd
+      rw [mul_comm f2.b _]
+      exact h_bd
+    field_simp [hd1]
+    unfold k
+    field_simp
+    rw[Eq.comm,mul_comm f2.d _]
+    exact h_bd_cross
+  }
+  have pro_c : f2.c = k * f1.c := by {
+    simp [hc1,hc2]
+  }
+  have pro_d : f2.d = k * f1.d := by {
+    simp only [k]
+    field_simp
+  }
+  constructor
+  exact hk
+  constructor
+  exact pro_a
+  constructor
+  exact pro_b
+  constructor
+  exact pro_c
+  exact pro_d
+
+/---FunEq to Proportional-/
+theorem FunEq2proportional (f1 f2 : LinearFracTrans) (h : f1.FunEq f2) :
+    f1.Proportional f2 := by
+  have hc_equiv : f1.c = 0 ↔ f2.c = 0 := c_zero_iff_of_funEq f1 f2 h
+  by_cases hc1 : f1.c = 0
+  · have hc2 : f2.c = 0 := hc_equiv.mp hc1
+    exact proportional_of_c_zero f1 f2 h hc1 hc2
+  · have hc2 : f2.c ≠ 0 := fun h2 => hc1 (hc_equiv.mpr h2)
+    exact proportional_of_c_ne_zero f1 f2 h hc1 hc2
+
+/-- Two LFTs are functionally equal iff their coefficients are proportional -/
+theorem funEq_iff_proportional (f1 f2 : LinearFracTrans) :
+    f1.FunEq f2 ↔ f1.Proportional f2 := by
+  constructor
+  · exact fun a ↦ FunEq2proportional f1 f2 a
+  · exact fun a ↦ proportional2FunEq f1 f2 a
+
+
+
 
 
 example (f : LinearFracTrans) (z : EComplex) :
