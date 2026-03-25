@@ -2170,6 +2170,36 @@ lemma lft_mul_left_inv (f : LinearFracTrans)
       apply div_self
       exact f.determinant_ne_zero
 
+lemma lft_mul_right_inv (f : LinearFracTrans)
+   : comp f (inv f)= id := by
+  unfold inv
+  ext
+  · unfold comp
+    simp
+    calc
+    _ = (f.d * f.a + (-f.b) * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
+  · unfold comp
+    simp
+    calc
+      _ = (f.d * f.b -f.d * f.b) / (f.a * f.d - f.b * f.c) := by ring
+      _ = 0 := by ring
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.c -f.a * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 0 := by ring
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
+
 
 -- The set of linear fractional transformations forms a group under composition
 instance : Group (LinearFracTrans) where
@@ -3030,6 +3060,442 @@ theorem funEq_iff_proportional (f1 f2 : LinearFracTrans) :
   · exact fun a ↦ proportional2FunEq f1 f2 a
 
 
+-- Infinity is fixed by T iff c = 0
+lemma infty_fixed_iff (T : LinearFracTrans) :
+   T none = none ↔ T.c = 0 := by
+  simp only [apply]
+  constructor
+  · intro h
+    split_ifs at h with hc
+    · exact hc
+  · intro hc
+    simp [hc]
+
+-- Finite point fixed iff satisfies quadratic equation
+lemma finite_fixed_iff (T : LinearFracTrans) (z : ℂ) (hdenom : T.c * z + T.d ≠ 0) :
+    T (some z) = some z ↔ T.c * z ^2 + (T.d -T.a) * z - T.b = 0 := by
+  simp only [apply]
+  split_ifs with h hneg
+  · {
+    constructor
+    intro hsome
+    injection hsome with hsome
+    rw [h,zero_mul,zero_add,sub_mul]
+    field_simp at hsome
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [h,mul_zero,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha,hd⟩
+    field_simp at hsome
+    rw[sub_eq_zero,sub_eq_iff_eq_add',mul_comm,Eq.comm]
+    exact hsome
+    intro hzero
+    rw [h,zero_mul,zero_add,sub_mul] at hzero
+    congr 1
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [h,mul_zero,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha,hd⟩
+    field_simp
+    rw [sub_eq_zero,sub_eq_iff_eq_add',Eq.comm] at hzero
+    exact hzero
+    }
+  · {
+    push_neg at h
+    constructor
+    simp
+    intro hzero
+    field_simp at hneg
+    rw [← propext (eq_div_iff_mul_eq h)] at hneg
+    rw [hneg] at hzero
+    field_simp at hzero
+    ring_nf at hzero
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [mul_comm,mul_comm T.b _] at det_not_zero
+    exact Ne.elim det_not_zero hzero
+    }
+  · {
+    push_neg at h hneg
+    constructor
+    intro hsome
+    injection hsome with hsome
+    rw [mul_comm] at hdenom
+    field_simp at hsome
+    rw[mul_add] at hsome
+    rw [sub_mul,add_sub,sub_eq_iff_eq_add',add_zero,sub_eq_iff_eq_add',hsome]
+    ring_nf
+    intro hsome
+    congr 1
+    rw [sub_eq_zero,Eq.comm] at hsome
+    apply (div_eq_iff hdenom).2
+    rw [hsome]
+    ring_nf
+    }
+
+-- Coefficient conditions imply functional identity
+lemma coeff_id_implies_fun_id (T : LinearFracTrans)
+    (hc : T.c = 0) (ha : T.a = T.d) (hb : T.b = 0) :
+    FunEq T id := by
+  have proportional_T_id : T.Proportional id := by
+    unfold Proportional
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [hb,zero_mul,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha_neg,hd_neg⟩
+    use 1/T.a
+    constructor
+    exact one_div_ne_zero ha_neg
+    constructor
+    rw [one_div_mul_cancel ha_neg]
+    rfl
+    constructor
+    rw [hb,mul_zero]
+    rfl
+    constructor
+    rw[hc,mul_zero]
+    rfl
+    rw [ha,one_div_mul_cancel]
+    rfl
+    exact hd_neg
+  exact proportional2FunEq T id proportional_T_id
+
+
+-- Key algebraic fact: a quadratic cz² + ez + f = 0 with c ≠ 0
+-- has at most 2 solutions
+lemma quadratic_at_most_two_roots (c e f : ℂ) (hc : c ≠ 0)
+    (z1 z2 z3 : ℂ) (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z1 ≠ z3)
+    (h1 : c * z1^2 + e * z1 + f = 0)
+    (h2 : c * z2^2 + e * z2 + f = 0)
+    (h3 : c * z3^2 + e * z3 + f = 0) :
+    False := by
+  have key12 : c * (z1 + z2) + e = 0 := by
+    have hsub : c * z1^2 + e * z1 + f - (c * z2^2 + e * z2 + f) = 0 := by
+      rw [h1,h2]; ring
+    have hfactor : (z1 - z2) * (c * (z1 + z2) + e) = 0 := by
+      calc (z1 - z2) * (c * (z1 + z2) + e)
+          = c * z1^2 - c * z2^2 + e * z1 - e * z2 := by ring
+        _ = c * z1^2 + e * z1 + f - (c * z2^2 + e * z2 + f) := by ring
+        _ = 0 := hsub
+    have hz12 : z1 - z2 ≠ 0 := sub_ne_zero.mpr hdist.1
+    exact (mul_eq_zero_iff_left hz12).mp hfactor
+  have key13 : c * (z1 + z3) + e = 0 := by
+    have hsub : c * z1^2 + e * z1 + f - (c * z3^2 + e * z3 + f) = 0 := by
+      rw [h1,h3]; ring
+    have hfactor : (z1 - z3) * (c * (z1 + z3) + e) = 0 := by
+      calc (z1 - z3) * (c * (z1 + z3) + e)
+          = c * z1^2 - c * z3^2 + e * z1 - e * z3 := by ring
+        _ = c * z1^2 + e * z1 + f - (c * z3^2 + e * z3 + f) := by ring
+        _ = 0 := hsub
+    have hz13 : z1 - z3 ≠ 0 := sub_ne_zero.mpr hdist.2.2
+    exact (mul_eq_zero_iff_left hz13).mp hfactor
+  have heq : c * (z1 + z2) = c * (z1 + z3) := by
+    calc c * (z1 + z2) = -e := by exact Eq.symm (neg_eq_of_add_eq_zero_left key12)
+    _ = c * (z1 + z3) := by exact neg_eq_of_add_eq_zero_left key13
+  have this1 : z1 + z2 = z1 + z3 := by
+    have := mul_left_cancel₀ hc heq
+    exact this
+  have this2 : z2 = z3 := add_left_cancel this1
+  exact hdist.2.1 this2
+
+-- When c = 0: the "quadratic" (d-a)z - b = 0 is linear
+-- If d ≠ a, it has exactly one root
+-- If d = a and b ≠ 0, it has no roots
+-- If d = a and b = 0, every z is a root
+lemma linear_two_roots_implies_trivial (e f : ℂ)
+    (z1 z2 : ℂ) (hdist : z1 ≠ z2)
+    (h1 : e * z1 + f = 0)
+    (h2 : e * z2 + f = 0) :
+    e = 0 ∧ f = 0 := by
+  have hsub : e * z1 + f - (e * z2 + f) = 0 := by rw [h1,h2]; ring
+  have : e * (z1 - z2) = 0 := by {
+    rw [mul_sub]
+    ring_nf at hsub
+    exact hsub
+  }
+  have he : e = 0 := by
+    by_contra hne
+    have : z1 - z2 = 0 := by
+      have := mul_eq_zero.mp this
+      exact this.resolve_left hne
+    exact hdist (sub_eq_zero.mp this)
+  have hf : f = 0 := by
+      calc f = e * z1 + f := by rw [he]; ring_nf
+         _ = 0 := h1
+  exact ⟨he , hf⟩
+
+
+/-!
+We prove this by case analysis on whether ∞ is one of the fixed points.
+-/
+
+-- Case 1: All three fixed points are finite
+lemma fixes_three_finite_is_id (T : LinearFracTrans) (z1 z2 z3 : ℂ)
+    (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z1 ≠ z3)
+    (hfix1 : T (some z1) = some z1)
+    (hfix2 : T (some z2) = some z2)
+    (hfix3 : T (some z3) = some z3) :
+    FunEq T id := by
+  have hdenom1 : T.c * z1 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix1
+    split_ifs at hfix1 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z1 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hdenom2 : T.c * z2 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix2
+    split_ifs at hfix2 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z2 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hdenom3 : T.c * z3 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix3
+    split_ifs at hfix3 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z3 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hquad1 : T.c * z1^2 + (T.d - T.a) * z1 - T.b = 0 := by
+    rw [finite_fixed_iff T z1 hdenom1] at hfix1
+    exact hfix1
+  have hquad2 : T.c * z2^2 + (T.d - T.a) * z2 - T.b = 0 := by
+    rw [finite_fixed_iff T z2 hdenom2] at hfix2
+    exact hfix2
+  have hquad3 : T.c * z3^2 + (T.d - T.a) * z3 - T.b = 0 := by
+    rw [finite_fixed_iff T z3 hdenom3] at hfix3
+    exact hfix3
+  have hc : T.c = 0 := by
+    by_contra hc_ne
+    exact quadratic_at_most_two_roots T.c (T.d - T.a) (-T.b) hc_ne
+      z1 z2 z3 hdist hquad1 hquad2 hquad3
+  have hlin1 : (T.d - T.a) * z1 - T.b = 0 := by
+    simp only [hc,zero_mul,zero_add] at hquad1
+    exact hquad1
+  have hlin2 : (T.d - T.a) * z2 - T.b = 0 := by
+    simp only [hc, zero_mul, zero_add] at hquad2
+    exact hquad2
+  have hcoeffs : T.d - T.a = 0 ∧ T.b = 0 := by
+    rw [sub_eq_add_neg] at hlin1
+    rw [sub_eq_add_neg] at hlin2
+    have : T.d - T.a = 0 ∧ -T.b = 0 := by {
+      apply linear_two_roots_implies_trivial (T.d - T.a) (-T.b) z1 z2 hdist.1 hlin1 hlin2
+    }
+    rcases this with ⟨h1,h2⟩
+    constructor
+    exact h1
+    exact neg_eq_zero.mp h2
+  have ha : T.a = T.d := by {
+    rcases hcoeffs with ⟨h1,h2⟩
+    rw [sub_eq_zero,Eq.comm] at h1
+    exact h1
+  }
+  have hb : T.b = 0 := by {
+    rcases hcoeffs with ⟨h1,h2⟩
+    exact h2
+  }
+  exact coeff_id_implies_fun_id T hc ha hb
+
+
+-- Case 2: ∞ is one of the fixed points
+-- If T(∞) = ∞, then c = 0, so T(z) = (az + b)/d
+-- Then T(z) = z means az + b = dz, i.e., (a - d)z + b = 0
+lemma fixes_infty_and_two_finite_is_id (T : LinearFracTrans) (z1 z2 : ℂ)
+    (hdist : z1 ≠ z2)
+    (hfix_infty : T none = none)
+    (hfix1 : T (some z1) = some z1)
+    (hfix2 : T (some z2) = some z2) :
+    FunEq T id := by
+    have hc : T.c = 0 := by exact (infty_fixed_iff T).mp hfix_infty
+    have hd_ne : T.d ≠ 0 := fun hd => T.determinant_ne_zero (by simp [hc, hd])
+    have hd1 : T.c * z1 + T.d ≠ 0 := by simp [hc, hd_ne]
+    have hd2 : T.c * z2 + T.d ≠ 0 := by simp [hc,hd_ne]
+    have h1 : (T.d - T.a) * z1 = T.b := by
+      have := (finite_fixed_iff T z1 hd1).mp hfix1
+      simp [hc] at this
+      rw [sub_eq_zero] at this
+      exact this
+    have h2 : (T.d - T.a) * z2 = T.b := by
+      have := (finite_fixed_iff T z2 hd2).mp hfix2
+      simp [hc] at this
+      rw [sub_eq_zero] at this
+      exact this
+    have ha : T.a = T.d := by
+      by_contra hne
+      have : z1 = z2 := by
+        field_simp[sub_ne_zero.mpr (Ne.symm hne)] at h1 h2
+        have eq : (T.d - T.a) * z1 = (T.d - T.a) * z2 := by rw [h1, h2]
+        have : (T.d - T.a) * (z1 - z2) = 0 := by rw [mul_sub, eq, sub_self]
+        have hneq : T.d - T.a ≠ 0 := by
+          contrapose! hne
+          rw [sub_eq_zero,Eq.comm] at hne
+          exact hne
+        rw [propext (mul_eq_zero_iff_left hneq),sub_eq_zero] at this
+        exact this
+      exact hdist this
+    have hb : T.b = 0 := by
+      simp [ha] at h1
+      rw[Eq.comm]
+      exact h1
+    intro z
+    cases z with
+    | none => {
+      simp [apply,hc,id]
+    }
+    | some z => {
+      simp only [apply,id]
+      simp only [hc,zero_mul,zero_add,ha,hb,add_zero]
+      simp
+      congr 1
+      field_simp
+    }
+
+
+-- Key lemma: LFT fixing three distinct points is the identity
+-- If T(zᵢ) = zᵢ for three distinct points, then T is the identity
+lemma fixes_three_is_id (f : LinearFracTrans) (z1 z2 z3 : EComplex)
+    (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1)
+    (hfix1 : f z1 = z1)
+    (hfix2 : f z2 = z2)
+    (hfix3 : f z3 = z3) :
+    f.FunEq id := by
+  cases z1 with
+  | some z1 => {
+    cases z2 with
+    | some z2 => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_three_finite_is_id f z1 z2 z3
+        · exact ⟨mt (congrArg some) hz.1, mt (congrArg some) hz.2.1, (mt (congrArg some) hz.2.2.symm)⟩
+        · exact hfix1
+        · exact hfix2
+        · exact hfix3
+      }
+      | none => {
+        apply fixes_infty_and_two_finite_is_id f z1 z2
+        · exact mt (congrArg some) hz.1
+        · exact hfix3
+        · exact hfix1
+        · exact hfix2
+      }
+    }
+    | none => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_infty_and_two_finite_is_id f z1 z3
+        · exact mt (congrArg some) hz.2.2.symm
+        · exact hfix2
+        · exact hfix1
+        · exact hfix3
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+  }
+  | none => {
+    cases z2 with
+    | some z2 => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_infty_and_two_finite_is_id f z2 z3
+        · exact mt (congrArg some) hz.2.1
+        · exact hfix1
+        · exact hfix2
+        · exact hfix3
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+    | none => {
+      cases z3 with
+      | some z3 => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+  }
+
+-- Main theorem: Uniqueness of LFT determined by three points
+-- If f and g agree on three distinct points, they agree everywhere
+theorem lft_uniqueness (f g : LinearFracTrans) (z1 z2 z3 : EComplex)
+    (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1)
+    (h1 : f z1 = g z1)
+    (h2 : f z2 = g z2)
+    (h3 : f z3 = g z3) :
+    FunEq f g := by
+  -- Strategy: show that g⁻¹ ∘ f fixes z₁, z₂, z₃
+  -- Then by fixes_three_is_id, g⁻¹ ∘ f = id
+  -- Therefore f = g
+  let h := comp (inv g) f
+  have hfix1 : h z1 = z1 := by
+    simp only [h]
+    rw [comp_equivalent,h1,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z1
+  have hfix2 : h z2 = z2 := by
+    simp only [h]
+    rw [comp_equivalent,h2,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z2
+  have hfix3 : h z3 = z3 := by
+    simp only [h]
+    rw [comp_equivalent,h3,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z3
+  have h_is_id : FunEq h id := fixes_three_is_id h z1 z2 z3 hdist hfix1 hfix2 hfix3
+  intro z
+  have : h z = id z := h_is_id z
+  simp only [h,comp_equivalent,id_apply] at this
+  calc f z
+      = g.apply ((inv g).apply (f.apply z)) := by rw [← comp_equivalent,lft_mul_right_inv,id_apply]
+    _ = g.apply z := by rw [this]
 
 
 
