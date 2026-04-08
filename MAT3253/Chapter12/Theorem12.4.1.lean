@@ -1,3 +1,8 @@
+/- This project was edited by [Aristotle](https://aristotle.harmonic.fun).
+
+Co-authored-by: Aristotle (Harmonic) <aristotle-harmonic@harmonic.fun>
+-/
+
 import Mathlib
 open Filter Topology Set
 set_option maxHeartbeats 8000000
