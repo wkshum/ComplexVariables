@@ -1,0 +1,273 @@
+\documentclass[11pt]{report}
+
+\usepackage{amsfonts, amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage{caption,subcaption}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{mathrsfs}
+\usepackage{tikz}
+\usepackage{tikz-cd}
+%\usetikzlibrary{circuits.ee.IEC}
+
+\usepackage{makeidx}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{color}
+\usepackage{longtable}
+%\usepackage{enumitem}
+
+\usetikzlibrary{calc, intersections}
+
+
+%\renewcommand{\labelenumi}{(\roman{enumi}).}
+%\renewcommand{\labelenumi}{(\alph{enumi}).}
+%\renewcommand{\labelenumi}{\arabic{enumi}.}
+
+\newif\iflean
+
+%\newif\ifexercise
+
+\leantrue
+
+%\exercisetrue 
+
+
+
+\input{lstpython.tex}
+
+\definecolor{keywordcolor}{rgb}{0.7, 0.1, 0.1}   % red
+\definecolor{tacticcolor}{rgb}{0.0, 0.1, 0.6}    % blue
+\definecolor{commentcolor}{rgb}{0.4, 0.4, 0.4}   % grey
+\definecolor{symbolcolor}{rgb}{0.0, 0.1, 0.6}    % blue
+\definecolor{sortcolor}{rgb}{0.1, 0.5, 0.1}      % green
+\definecolor{attributecolor}{rgb}{0.7, 0.1, 0.1} % red
+
+
+\def\lstlanguagefiles{lstlean.tex}
+
+\def\PDF{1}
+\ifdefined\PDF
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	linkcolor=Mahogany,
+	citecolor = RedViolet,
+	urlcolor=blue,
+	linktoc=all
+}
+\fi
+
+
+\usetikzlibrary{decorations.markings}
+
+
+\newenvironment{whitebox}{\begin{tcolorbox}
+		[width=\linewidth, sharp corners=all, colback=white]}
+	{\end{tcolorbox}}
+
+
+\newenvironment{greenbox}{\begin{tcolorbox}
+		[width=\linewidth, sharp corners=all, colback=white!95!green]}
+	{\end{tcolorbox}}
+
+
+\newenvironment{svgraybox}{\begin{tcolorbox}
+		[width=\linewidth, sharp corners=all, colback=white!95!black]}
+	{\end{tcolorbox}}
+
+\newenvironment*{warning}[1]{\begin{tcolorbox} 
+		[width=\linewidth, sharp corners=all, colback=white!95!black]
+		{\bf #1.}
+	}
+	{\end{tcolorbox}}
+
+
+\newenvironment*{backgroundinformation}[1]{\begin{tcolorbox} 
+		[width=\linewidth, sharp corners=all, colback=white!95!black]
+		{\bf #1.}
+	}
+	{\end{tcolorbox}}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newtheorem*{note}{Note}
+\newtheorem{example}{Example}[section]
+
+\newcommand{\bp}{{\mathbf{p}}}
+\newcommand{\bq}{{\mathbf{q}}}
+\newcommand{\br}{{\mathbf{r}}}
+\newcommand{\bx}{{\mathbf{x}}}
+\newcommand{\by}{{\mathbf{y}}}
+\newcommand{\bz}{{\mathbf{z}}}
+\newcommand{\bX}{{\mathbf{X}}}
+\newcommand{\bY}{{\mathbf{Y}}}
+\newcommand{\bZ}{{\mathbf{Z}}}
+\newcommand{\blambda}{\boldsymbol{\lambda}}
+\newcommand{\bmu}{\boldsymbol{\mu}}
+\newcommand{\bpi}{\boldsymbol{\pi}}
+\newcommand{\LEAN}{{$\mathsf{LEAN}$ }}
+
+\numberwithin{equation}{section}
+
+
+\newcommand{\df}[1]{{\color{red} \emph{#1}}}
+\newcommand{\ms}[1]{\mathscr{{#1}}}
+\DeclareMathOperator{\mc}{\mathrm{mc}}
+\DeclareMathOperator{\real}{\mathrm{Re}}
+\DeclareMathOperator{\imag}{\mathrm{Im}}
+\DeclareMathOperator{\re}{\mathrm{Re}}
+\DeclareMathOperator{\im}{\mathrm{Im}}
+\DeclareMathOperator{\abs}{\mathrm{abs}}
+\DeclareMathOperator{\Arg}{\mathrm{Arg}}
+\DeclareMathOperator{\Log}{\mathrm{Log}}
+\DeclareMathOperator{\Res}{\mathrm{Res}}
+\DeclareMathOperator{\ord}{\mathrm{ord}}
+\DeclareMathOperator{\sech}{\mathrm{sech}}
+\DeclareMathOperator{\csch}{\mathrm{csch}}
+
+\DeclareMathOperator*{\argmin}{\mathrm{arg\,min}}
+\newcommand{\del}{\partial}
+
+
+
+\title{MAT3253 Complex Variables \\
+	Lecture Notes}
+\author{Kenneth Shum}
+\date{Spring 2026}
+
+\renewcommand{\baselinestretch}{1.2}
+\addtolength{\oddsidemargin}{-.5in}
+\addtolength{\evensidemargin}{-.5in}
+\addtolength{\textwidth}{1in}
+
+\makeindex
+
+
+\begin{document}
+	\maketitle
+	
+	\pagenumbering{roman}
+
+	
+	
+	\tableofcontents
+
+\smallskip
+
+
+\begin{thebibliography}{9}
+	\bibitem[Ahlfors]{Ahlfors} Ahlfors, \emph{Complex analysis -- an introduction to the theory of analytic functions of one complex variable}, 3rd edition, McGraw-Hill, New York, 1979.
+
+	\bibitem[BakNewman]{BakNewman} J. Bak and D. J. Newman, \emph{Complex analysis},  third edition, Springer, 2010.
+
+%	\bibitem[Berge]{Berge} C. Berge, \emph{Topological spaces}, Dover, 1997.
+
+	\bibitem[BrownChurchill]{BrownChurchill} J. W. Brown and R. V. Churchill,  \emph{Complex Variables and Applications}, 9th edition, McGraw-Hill, New York, 2014.	
+
+%	\bibitem[Freitag]{Freitag} E. Freitag and R. Busam, \emph{Complex analysis},  third edition, Springer, 2005.
+
+	\bibitem[ChernChenLam]{ChernChenLam} S. S. Chern, W. H. Chen and K. S. Lam, \emph{ Lectures on differential geometry}, World Scientific, 2016.
+	
+	\bibitem[Hua]{Hua} L.-K. Hua, \emph{An introduction to higher mathematics,} vol. 2, Cambridge University Press, 2012.
+
+	\bibitem[Gong]{Gong} S. Gong and Y. Gong, \emph{Concise Complex Analysis},  revised edition, World Scientific, 2007.
+
+
+%	\bibitem[Miranda]{Miranda} R. Miranda, \emph{Algebraic curves and Riemann surface}, Graduate Studies in Mathematics, vol. 5, American Mathematical Society, 1995.	
+	
+	\bibitem[Rudin]{Rudin} W. Rudin,  \emph{Principles of mathematical analysis}, 3rd edition, McGraw-Hill, 1976.
+	
+
+	\bibitem[Spivak]{Spivak} M. Spivak, \emph{Calculus on manifolds -- a modern approach to classical theorems of advanced calculus}, Addison-Wesley, 1965.
+
+	\bibitem[Stein]{Stein} E. M. Stein and R. Shakarchi,  \emph{Complex analysis}, Princeton Lectures in Analysis, Princeton University Press, New York, 2003.
+	
+	\bibitem[StewartTall]{StewardTall} I. Stewart and D. Tall, \emph{Complex analysis}, 2nd edition, Cambridge University Press, 2018.
+
+	\bibitem[ZillShanahan]{ZillShanahan} D. G. Zill and P. D. Shanahan, \emph{Complex analysis -- a first course with applications}, third edition, Jones \& Bartlett Learning, 2014.
+\end{thebibliography}
+
+
+\newpage
+
+
+\section{Notation}
+
+
+\noindent {\bf List of symbols and notation}
+
+\begin{longtable}{ll}
+ $i$ & Imaginary unit \\
+ $\mathbb{N}$ &Set of integers larger than or equal to 1 \\
+ $\mathbb{N}_{\geq 0}$& Set of integers larger than or equal to 0\\
+ $\mathbb{Z}$ & Set of integers \\
+ $\mathbb{Q}$ & Set of rational numbers \\
+ $\mathbb{R}$ & Set of real numbers \\
+ $\mathbb{C}$ & Set of complex numbers \\
+ $\bar{\mathbb{C}}$ & Extended complex plane \\
+ $\sup$, $\inf$ & Supremum and infinum \\
+ $\limsup$ & Limit superior \\
+ $\liminf$ & Limit inferior \\
+ $\bar{z}$, $z^*$ & Conjugate of complex number $z$ \\
+ $\real(z)$ & Real part of $z$ \\
+ $\imag(z)$ & Imaginary part of $z$ \\
+ $|z|$, $\abs(z)$ & The modulus/absolute value/magnitude of $z$ \\
+ $\arg(z)$ & The argument/angle of $z$ \\
+ $\Arg (z)$ & Principal argument of $z$ \\
+ $[z_0,z_1,z_2,z_3]$ & Cross ratio \\
+ $\infty$ &  Point at infinity \\
+ $\exp(z)$ & Complex exponential function \\
+ $\log(z)$ & Complex log function \\
+ $\Log(z)$ & Principal branch of complex log function \\
+ $f^{-1}(U)$ & Inverse image of a set $U$ through the function $f$\\
+ $\overline{S}$ & Closure of a set $S$ in $\mathbb{C}$ \\
+ $\overline{S}^X$ & Relative closure of $S$ in $X$ \\
+ $\mathcal{T}_X$ & Relative topology of a set $X$ in $\mathbb{C}$ \\
+ $\mathbf{1}_S$ & Indicator function of a set $S$ \\
+ $D(z,r)$ & Open disk with radius $r$ centered at $z$ \\
+ $\overline{D}(z,r)$ & Closed disk with radius $r$ centered at $z$ \\
+ $(df)_\mathbf{p}$ & Differential of $f$ at a point $\mathbf{p}$\\
+ $f(z) dz$ & Complex differential form \\
+ $f'(z)$, $df/dz$ & Complex derivative of function $f$\\
+ $f^{(n)}$ & the $n$-th order derivative of function $f(z)$ \\
+ $\frac{\partial}{\partial x}$, $\frac{\partial }{\partial y}$ &  Partial differential operators with respect to $x$ and $y$\\
+ $\frac{\partial}{\partial z}$, $\frac{\partial }{\partial \bar{z}}$ &  Partial differential operators with respect to $z$ and $\bar{z}$ \\
+ $-C$ & Reverse of contour $C$ \\
+ $C_1+C_2$ & Concatenation of contours $C_1$ and $C_2$ \\
+ $\int_C f \, dz$ & Complex integral of $f$ along a curve $C$\\
+ $\oint_C f \, dz$ & Complex integral of $f$ along a closed curve $C$\\ 
+ $\Res(f;z_0)$ & Residue of function $f$ at the point $z_0$ \\
+ $\mathcal{O}(D)$ & The ring of holomorphic functions defined on a domain $D$ \\
+$\mathcal{M}(D)$ & The field of meromorphic functions defined on a domain $D$ \\
+ $n(C;z_0)$ & Winding number of a closed curve $C$ relative to the point $z_0$ 
+%$\wp(z;\Lambda)$ &  Weierstass P function
+\end{longtable}
+
+
+\input{chapter1-4}
+
+\input{chapter5-7}
+
+%\input{chapter8-10}
+
+%\input{chapter11-12}
+
+%\input{chapter13-15}
+
+%\input{chapter16-17}
+
+
+%\printindex
+
+\end{document}
+
