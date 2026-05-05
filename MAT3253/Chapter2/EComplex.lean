@@ -32,9 +32,10 @@ Main content:
 
 import Mathlib.Tactic
 import Mathlib.Data.Complex.Basic
+import Mathlib.Data.List.Pairwise
 
 set_option linter.style.longLine false
-
+set_option linter.style.multiGoal false
 noncomputable section
 
 open Complex
@@ -312,6 +313,9 @@ theorem some_add_coe (x y : ℂ) : ((some x) + ↑y : EComplex) = ↑(x + y) :=
   rfl
 
 
+
+
+
 example : some 3 - some 5 = some (-2) := by
   -- Convert subtraction to your definition
   rw [← EComplex_subtraction]
@@ -425,10 +429,44 @@ example : infty.div infty = infty := by
   simp [EComplex.div, infty, EComplex.inv]
   norm_cast
 
+example : some 0 / some 1 = some 0 := by
+ change EComplex.div ↑0 ↑1 = some 0
+ unfold EComplex.div
+ unfold EComplex.inv
+ simp only [one_ne_zero, ↓reduceIte, inv_one]
+ change EComplex.mul ↑0 ↑1 = some 0
+ unfold EComplex.mul
+ simp
+
+/-! ## EComplex arithmetic lemmas -/
 
 
+lemma sub_some (a b : ℂ) :
+    some a - some b = some (a - b) := by
+  rw [← EComplex_subtraction]
+  unfold EComplex.sub
+  rw [← EComplex_multiplication]
+  unfold EComplex.mul
+  simp only [neg_mul, one_mul, coe_neg]
+  rw [← coe_neg]
+  exact ((fun a ↦ a) ∘ fun a ↦ a) rfl
+
+
+lemma div_some (a b : ℂ) (hb : b ≠ 0) :
+    some a / some b = some (a / b) := by
+  rw [← coe_div]
+  exact hb
+
+
+lemma mul_some (a b : ℂ) :
+    some a * some b = some (a * b) := by
+  exact coe_mul_some a b
+
+
+#check (some 3) / (some 5)
 end EComplex
 
+#check EComplex.sub_some
 
 
 
@@ -507,7 +545,6 @@ example : f_test1 (some 3) = some 5 := by
   norm_num
 
 
-
 -- Some helper lemmas about nonzero coefficients of LFTs
 
 -- If c is zero, then a and d are nonzero
@@ -537,7 +574,7 @@ theorem f_infty_infty {f : LinearFracTrans} (hc : f.c = 0) :
 @[simp]
 theorem f_z_azbd {f : LinearFracTrans} {z : ℂ} (hc : f.c = 0) :
     f z = (f.a*z+f.b)/f.d := by
-  simp [apply, hc]
+  simp only [apply, hc, ↓reduceIte]
   have hd_ne_zero : f.d ≠ 0 := (a_d_nonzero_of_c_zero f.determinant_ne_zero hc).2
   rw [← EComplex.coe_mul, ← EComplex.coe_add]
   rw [← EComplex.coe_div _ _ hd_ne_zero]
@@ -556,7 +593,7 @@ theorem f_infty_a_div_c {f : LinearFracTrans} (hc : f.c ≠ 0) :
 theorem f_neg_d_div_c_infty {f : LinearFracTrans} (hc : f.c ≠ 0) :
     f (-f.d/f.c) = ∞ := by
   -- Unfold `apply` and use `hc` to show 'if f.c = 0' is false
-  simp [apply, if_neg hc]
+  simp only [apply, if_neg hc]
   rw [← EComplex.coe_neg]
   rw [← EComplex.coe_div _ _ hc]
   simp only [↓reduceIte]
@@ -576,6 +613,13 @@ theorem f_value_when_c_nonzero {f : LinearFracTrans} {z : ℂ}
     contradiction
   rw [← EComplex.coe_div _ _ h]
   congr
+
+
+-- Determinant appears in the numerator
+lemma apply_sub_apply_num (f : LinearFracTrans) (z w : ℂ) :
+    (f.a * z + f.b) * (f.c * w + f.d) - (f.a * w + f.b) * (f.c * z + f.d) =
+    (f.a * f.d - f.b * f.c) * (z - w) := by
+  ring
 
 
 
@@ -637,7 +681,6 @@ theorem id_apply (z : EComplex) : (id : LinearFracTrans) z = z := by
   -- Simplify the arithmetic coefficients using the fact that a=1, b=0, c=0, d=1
   simp only [↓reduceIte, ne_eq, one_ne_zero, not_false_eq_true, div_self, one_mul, div_one,
     add_zero]
-
   -- Now the goal is: (match z with ... ) = z
   -- Split into the two cases of EComplex: ∞ (none) and Finite (some)
   cases z with
@@ -748,22 +791,18 @@ theorem IsAffine_iff_affine_action (f : LinearFracTrans) :
         apply div_ne_zero
         · exact left_ne_zero_of_mul h_ad_ne0
         · exact right_ne_zero_of_mul h_ad_ne0
-
       dsimp [EComplex.some, Zero.zero]
       assumption
-
     · -- Formula matches
       intro z
       -- Use the earlier lemma f_z_azbd (f.c = 0)
       rw [f_z_azbd h_affine]
       norm_cast
       field_simp [right_ne_zero_of_mul h_ad_ne0]
-
   · -- Backward: If f(z) = Az + B, then c=0
     rintro ⟨A, B, hA, h_eq⟩
     by_contra hc_ne0
     have hc_ne0_val : f.c ≠ 0 := hc_ne0
-
     -- If c ≠ 0, then at z = -d/c, f(z) = ∞
     let z_pole := -f.d / f.c
     have h_pole : f z_pole = ∞ := by
@@ -772,10 +811,8 @@ theorem IsAffine_iff_affine_action (f : LinearFracTrans) :
       have h_coe: ((-↑f.d / ↑f.c) : EComplex) = some (-f.d / f.c) := by norm_cast
       rw [← h_coe]
       exact f_neg_d_div_c_infty hc_ne0_val
-
     -- But the formula says f(z) = Az + B (finite)
     have h_finite : f z_pole = A * z_pole + B := h_eq z_pole
-
     -- Contradiction: ∞ = finite
     rw [h_finite] at h_pole
     contradiction
@@ -799,7 +836,7 @@ lemma decomposition_nonaffine (f : LinearFracTrans) (hc : f.c ≠ 0) :
   let t1 := translation (f.a / f.c)
   let k := (f.b * f.c - f.a * f.d) / f.c
   let s1 := scaling k (by
-    simp +zetaDelta
+    simp +zetaDelta only [ne_eq, div_eq_zero_iff, not_or]
     exact ⟨ fun h => f.determinant_ne_zero <| by linear_combination -h, hc ⟩)
   let i := inversion
   let t2 := translation f.d
@@ -819,13 +856,13 @@ lemma decomposition_affine (f : LinearFracTrans) (hc : f.c = 0) :
   let s_a := scaling f.a (by
     have h := f.determinant_ne_zero
     rw [hc] at h
-    simp at h
+    simp only [mul_zero, sub_zero, ne_eq, mul_eq_zero, not_or] at h
     exact h.1)
   let t_b := translation f.b
   let s_d := scaling f.d (by
     have h := f.determinant_ne_zero
     rw [hc] at h
-    simp at h
+    simp only [mul_zero, sub_zero, ne_eq, mul_eq_zero, not_or] at h
     exact h.2)
   let i := inversion
   f = (i.comp (s_d.comp i)).comp (t_b.comp s_a) := by
@@ -863,7 +900,6 @@ theorem decomposition_general (f : LinearFracTrans) : IsDecomposable f := by
     · apply IsDecomposable.comp
       · apply IsDecomposable.translation
       · apply IsDecomposable.scaling
-
   · -- Case c ≠ 0
     -- We use the decomposition theorem provided by the user
     let decomp := decomposition_nonaffine f hc
@@ -900,10 +936,9 @@ private lemma case11 {f g : LinearFracTrans} {z : EComplex}
   -- In this case, all three transformations are affine.
   -- The composition is also affine, and the formula simplifies significantly.
   have h_comp : (comp f g).c = 0 := by
-    simp [comp]
+    simp only [comp]
     rw [hf, hg]
     simp
-
   cases z with
   | none =>
   -- Case z = ∞.
@@ -913,26 +948,22 @@ private lemma case11 {f g : LinearFracTrans} {z : EComplex}
     have hd_f : f.d ≠ 0 := (a_d_nonzero_of_c_zero f.determinant_ne_zero hf).2
     have hd_g : g.d ≠ 0 := (a_d_nonzero_of_c_zero g.determinant_ne_zero hg).2
     have hd_comp : (comp f g).d ≠ 0 := by
-      simp [comp]
+      simp only [comp, ne_eq]
       intro hd_zero
       rw [hf] at hd_zero
-      simp at hd_zero
+      simp only [zero_mul, zero_add, mul_eq_zero] at hd_zero
       obtain h1|h2 := hd_zero <;>
       · contradiction
-
     -- 1. Rewrite LHS: (comp f g) z
     rw [← apply_lft_coe]
     rw [@f_z_azbd (comp f g) _ h_comp]
-
     -- 2. Rewrite RHS: f (g z)
     --    First rewrite inner g z
     rw [← apply_lft_coe]
     rw [@f_z_azbd g _ hg]
-
     -- 3. Now rewrite outer f (...).
     norm_cast
     rw [@f_z_azbd f _ hf]
-
     -- 4. Solve the algebra
     norm_cast
     dsimp [comp] -- Expand the definition of comp.a, comp.b, etc.
@@ -953,10 +984,8 @@ private lemma comp_f_g_not_affine1 {f g : LinearFracTrans}
   -- 1. Unfold the definition of composition for 'c'
   --    (comp).c = f.c * g.a + f.d * g.c
   simp only [comp]
-
   -- 2. Substitute f.c = 0. The formula becomes: 0 + f.d * g.c
   rw [hf, zero_mul, zero_add]
-
   -- 3. To prove f.d * g.c ≠ 0, we need both f.d ≠ 0 and g.c ≠ 0.
   apply mul_ne_zero
   · -- Prove f.d ≠ 0 using the determinant condition of f
@@ -989,16 +1018,13 @@ private lemma case121 {f g : LinearFracTrans} {z : EComplex}
   (hf : f.c = 0) (hg : g.c ≠ 0) (h_comp : (comp f g).c ≠ 0)
   (h_pole : g.c * z + g.d = 0)
   : (comp f g) z = f (g z) := by
-
   have h_d_nonzero : f.d ≠ 0 := (a_d_nonzero_of_c_zero f.determinant_ne_zero hf).2
-
   -- Verify z must be finite (since ∞ is not a pole)
   cases z with
   | none =>
     -- g.c * ∞ + g.d = ∞ + g.d = ∞. Since ∞ ≠ 0, this case is impossible.
     contradiction
   | some z =>
-
     -- z is finite. h_pole says: g.c * z + g.d = 0
     have h_z_val : z = -g.d / g.c := by
       -- Solve g.c * z + g.d = 0
@@ -1011,14 +1037,12 @@ private lemma case121 {f g : LinearFracTrans} {z : EComplex}
       field_simp
       rw [eq_neg_iff_add_eq_zero, mul_comm]
       assumption
-
     -- Evaluate RHS: f (g z)
     -- Since denominator is 0, g z = ∞
     rw [apply]
     --simp only [hg, h_pole, if_false, ite_true] -- simplify g's apply
     --    f ∞ = ∞ (because f.c = 0)
     rw [← f_infty_infty  hf]
-
     -- Evaluate LHS: (comp f g) z
     -- We claim z is also the pole for the composition
     rw [apply]
@@ -1035,13 +1059,11 @@ private lemma case121 {f g : LinearFracTrans} {z : EComplex}
       simp only [add_eq_right, mul_eq_zero]
       left
       exact hf
-
     -- Show that z is also a pole of the composite function (comp f g)
     have hh : z = -(comp f g).d / (comp f g).c  := by
       rw [h_comp_c, h_comp_d]
       rw [h_z_val]
       field_simp [h_d_nonzero]
-
     -- Since z is a pole, the function returns ∞
     rw [if_pos hh]
     simp [apply, hf, hg, h_z_val]
@@ -1051,7 +1073,6 @@ private lemma case122 {f g : LinearFracTrans} {z : EComplex}
   (h_non_pole : g.c * z + g.d ≠ 0)
   : (comp f g) z = f (g z) := by
   have hd_f : f.d ≠ 0 := (a_d_nonzero_of_c_zero f.determinant_ne_zero hf).2
-
   cases z with
   | none =>
       -- z = ∞
@@ -2092,9 +2113,6 @@ theorem comp_equivalent (z : EComplex) (f g : LinearFracTrans)
         exact case222 hf hg h_comp
 
 
-
-
-
 -- The identity linear fractional transformation is the identity element
 -- for composition
 lemma lft_one_mul (f : LinearFracTrans)
@@ -2189,6 +2207,432 @@ instance : Group (LinearFracTrans) where
     apply lft_mul_left_inv
 
 
+<<<<<<< Updated upstream
+=======
+
+
+/-
+Lemma preparing for prove exist LFT mapping three distinct point to three other distinct point
+-/
+
+  --construct lft, s.t. z1 ↦ 0 , z2 ↦ 1 ,z3 ↦ ∞
+def construct_lft_to0_1_infty (z1 z2 z3 : EComplex)
+  (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1) : LinearFracTrans :=
+  match z1 , z2 , z3 with
+  | ∞ , some z2 , some z3 => { a := 0 , b := z2 - z3, c := 1 , d := -z3 , determinant_ne_zero := by {
+      simp only [mul_neg, zero_mul, neg_zero, mul_one, zero_sub, neg_sub, ne_eq]
+      push_neg
+      rcases hz with ⟨h1,h2,h3⟩
+      apply sub_ne_zero.2
+      exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h2))
+       }}
+  | some z1 , ∞ , some z3 => {a := 1 , b := - z1 , c := 1 , d := - z3 , determinant_ne_zero := by {
+    simp only [mul_neg, one_mul, mul_one, sub_neg_eq_add, ne_eq]
+    push_neg
+    rcases hz with ⟨h1,h2,h3⟩
+    rw [neg_add_eq_sub]
+    apply sub_ne_zero.2
+    exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+    }}
+  | some z1 ,some z2 , ∞ => {a := 1 , b := - z1 , c := 0 , d :=  z2 - z1 , determinant_ne_zero := by {
+    simp only [one_mul, mul_zero, sub_zero, ne_eq]
+    push_neg
+    apply sub_ne_zero.2
+    rcases hz with ⟨h1,h2,h3⟩
+    exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h1))
+  }}
+  | some z1 , some z2 , some z3 => {a := z2 - z3, b :=   -z1 * (z2 - z3) , c := z2 - z1, d :=  -z3 * (z2 -z1) , determinant_ne_zero := by {
+    simp only [neg_mul, mul_neg, sub_neg_eq_add, ne_eq]
+    push_neg
+    rcases hz with ⟨h1,h2,h3⟩
+    have hsimp : -((z2 - z3) * (z3 * (z2 - z1))) + z1 * (z2 - z3) * (z2 - z1)  = (z1 - z2) * (z2 - z3) * (z3 - z1) := by ring
+    rw [hsimp]
+    have h12 : z1 - z2 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h1 (congrArg some a)
+    have h23 : z2 - z3 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h2 (congrArg some a)
+    have h31 : z3 - z1 ≠ 0 := by exact sub_ne_zero_of_ne fun a => h3 (congrArg some a)
+    apply mul_ne_zero
+    apply mul_ne_zero
+    assumption
+    assumption
+    assumption
+  }}
+
+ -- proving that constructed lft actually mapping z1 z2 z3 to 0 1 ∞
+theorem constructlft_map_to_01infty (z1 z2 z3 : EComplex) (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1) :
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z1 = some 0 ∧
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z2 = some 1 ∧
+    (construct_lft_to0_1_infty z1 z2 z3 hz) z3 = ∞ := by
+    let f := construct_lft_to0_1_infty z1 z2 z3 hz
+    have hf : construct_lft_to0_1_infty z1 z2 z3 hz = f := by rfl
+    rw [hf]
+    cases z1 with
+    | none => {
+      cases z2 with
+      | none => {
+        cases z3 with
+        | none => {
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+      }
+      | some z2 => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          simp only [ne_eq, one_ne_zero, not_false_eq_true, f_infty_a_div_c]
+          unfold LinearFracTrans.apply
+          simp only [one_ne_zero, ↓reduceIte, neg_neg, div_one, zero_mul, zero_add, one_mul,
+            and_true]
+          constructor
+          change EComplex.div ↑0 ↑1 = some 0
+          unfold EComplex.div
+          unfold EComplex.inv
+          simp only [one_ne_zero, ↓reduceIte, inv_one]
+          change EComplex.mul ↑0 ↑1 = some 0
+          unfold EComplex.mul
+          simp only [mul_one]
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          exact (congrArg EComplex.some ∘ congrArg (@OfNat.ofNat ℂ 0)) rfl
+          split_ifs
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          contradiction
+          rw [← sub_eq_add_neg]
+          have h23_not_eql : z2 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp h2
+          have fraction_eq1 : (z2 - z3) / (z2 - z3) = 1 := by {
+            apply div_self
+            (expose_names; exact sub_ne_zero_of_ne h)
+          }
+          rw [fraction_eq1]
+        }
+      }
+    }
+    | some z1 => {
+      cases z2 with
+      | none => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          contradiction
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          simp only [ne_eq, one_ne_zero, not_false_eq_true, f_infty_a_div_c]
+          unfold LinearFracTrans.apply
+          simp only [one_ne_zero, ↓reduceIte, neg_neg, div_one, one_mul, add_neg_cancel, zero_div,
+            ite_eq_right_iff, reduceCtorEq, imp_false, and_true]
+          constructor
+          push_neg
+          exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          change EComplex.div ↑1 ↑1 = some 1
+          unfold EComplex.div
+          unfold EComplex.inv
+          simp only [one_ne_zero, ↓reduceIte, inv_one]
+          change EComplex.mul ↑1 ↑1 = some 1
+          unfold EComplex.mul
+          simp
+          rfl
+        }
+      }
+      | some z2 => {
+        cases z3 with
+        | none => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          have h12_not_eql : z2 - z1 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          unfold construct_lft_to0_1_infty
+          simp only [f_infty_infty, and_true]
+          unfold LinearFracTrans.apply
+          simp
+          constructor
+          field_simp
+          simp
+          field_simp
+          rw [← sub_eq_add_neg]
+          have fraction_eq1 : (z2 - z1) / (z2 - z1) = 1 := by {
+            exact (div_eq_one_iff_eq h12_not_eql).mpr rfl
+          }
+          rw [fraction_eq1]
+        }
+        | some z3 => {
+          rcases hz with ⟨h1,h2,h3⟩
+          rw [← hf]
+          unfold construct_lft_to0_1_infty
+          unfold LinearFracTrans.apply
+          have h12 : z1 ≠ z2 := by exact fun a => h1 (congrArg Option.some a)
+          have h23 : z2 ≠ z3 := by exact fun a => h2 (congrArg Option.some a)
+          have h13 : z1 ≠ z3 := by exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          simp
+          have h12_not0 : z2 -z1 ≠ 0 := by exact sub_ne_zero_of_ne (_root_.id (Ne.symm h12))
+          have h23_not0 : z2 -z3 ≠ 0 := by exact sub_ne_zero_of_ne h23
+          have h31_not0 : z3 -z1 ≠ 0 := by exact sub_ne_zero_of_ne (_root_.id (Ne.symm h13))
+          simp [h12_not0,h23,h13]
+          constructor
+          have h123 : (z2 - z3) * z1 + -(z1 * (z2 - z3)) = 0 := by ring
+          rw [h123,zero_div]
+          congr 1
+          field_simp
+          rw [show z2 + -z1 = z2 - z1 by ring, show z2 + -z3 = z2 - z3 by ring]
+          exact mul_div_cancel_left₀ (z2 - z1) h23_not0
+        }
+      }
+    }
+
+ -- prove inverse lft map 0,1,∞ to w1 w2 w3
+theorem proof_inv_constructlft_map_to_01infty (w1 w2 w3 : EComplex) (hw : w1 ≠ w2 ∧ w2 ≠ w3 ∧ w3 ≠ w1) :
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) (some 0) = w1 ∧
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) (some 1) = w2 ∧
+    LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) ∞ = w3 := by
+    let g := LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw)
+    have hg : LinearFracTrans.inv (construct_lft_to0_1_infty w1 w2 w3 hw) = g := by rfl
+    unfold LinearFracTrans.apply
+    unfold LinearFracTrans.inv
+    unfold construct_lft_to0_1_infty
+    rcases hw with ⟨h1,h2,h3⟩
+    cases w1 with
+    | none => {
+      cases w2 with
+      | none => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          contradiction
+        }
+      }
+      | some w2 => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          simp only [mul_neg, zero_mul, neg_zero, mul_one, zero_sub, neg_sub, div_eq_zero_iff,
+            neg_eq_zero, one_ne_zero, false_or, zero_div, div_zero, mul_zero, add_zero, ↓reduceIte,
+            ite_eq_right_iff, reduceCtorEq, imp_false]
+          constructor
+          push_neg
+          exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          constructor
+          have h32_not0 : w3 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          simp [h32_not0]
+          congr 1
+          field_simp [h32_not0]
+          ring
+          have h32_not0 : w3 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          simp [h32_not0]
+          congr 1
+          field_simp [h32_not0]
+        }
+      }
+    }
+    | some w1 => {
+      cases w2 with
+      | none => {
+        cases w3 with
+        | none => {
+          contradiction
+        }
+        | some w3 => {
+          simp only [mul_neg, one_mul, mul_one, sub_neg_eq_add, div_eq_zero_iff, neg_eq_zero,
+            one_ne_zero, false_or, one_div, div_inv_eq_mul, mul_zero, neg_neg, zero_add]
+          constructor
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          push_neg
+          field_simp
+          exact zero_ne_one' ℂ
+          constructor
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          field_simp
+          have w31_not0 : -w3 + w1 ≠ 0 := by {
+            rw [neg_add_eq_sub]
+            rw [sub_ne_zero]
+            exact EComplex.coe_ne_coe_iff.mp (_root_.id (Ne.symm h3))
+          }
+          simp [w31_not0]
+          congr 1
+          field_simp
+        }
+      }
+      | some w2 => {
+        cases w3 with
+        | none => {
+          simp
+          constructor
+          congr 1
+          have w21_not0 : (w2 - w1) ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          congr 1
+          have w21_not0 : (w2 - w1) ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          ring
+        }
+        | some w3 => {
+          simp only [neg_sub, neg_mul, mul_neg, sub_neg_eq_add, div_eq_zero_iff, mul_zero, neg_neg,
+            zero_add, mul_one]
+          have h12_not0 : w1 - w2 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some a)
+          }
+          have h23_not0 : w2 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some a)
+          }
+          have h31_not0 : w3 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some a)
+          }
+          have neg_h13_not0 : -w3 + w1 ≠ 0 := by {
+              rw [neg_add_eq_sub]
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          have if_condiction2_false : -((w2 - w3) * (w3 * (w2 - w1))) + w1 * (w2 - w3) * (w2 - w1) ≠ 0 := by {
+            intro h
+            have factored : -((w2 - w3) * (w3 * (w2 - w1))) + w1 * (w2 - w3) * (w2 - w1)
+              = (w2 - w3) * (w2 - w1) * (w1 - w3) := by ring
+            rw [factored] at h
+            simp only [mul_eq_zero] at h
+            rcases h with htwo | h13
+            rcases htwo with h23 | h13
+            contradiction
+            have contra_cond : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            contradiction
+            have contra_cond : w1 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            contradiction
+          }
+          simp [h12_not0, if_condiction2_false]
+          constructor
+          rw [if_neg]
+          · {
+            congr 1
+            have h23_not0 : w2 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h2 (congrArg some a)
+            }
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp [h23_not0,h21_not0]
+            }
+          · {
+            push_neg
+            field_simp
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            intro h
+            field_simp at h
+            rw [zero_mul] at h
+            rw [zero_eq_neg] at h
+            contradiction
+            }
+          constructor
+          rw [if_neg]
+          · {
+            congr 1
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            have h13_not0 : w1 - w3 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h3 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            simp
+            field_simp
+            ring
+            }
+          · {
+            push_neg
+            have h21_not0 : w2 - w1 ≠ 0 := by {
+              exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+            }
+            field_simp
+            rw [neg_div']
+            intro h
+            field_simp at h
+            rw [neg_sub,eq_sub_iff_add_eq,sub_add_cancel] at h
+            exact Ne.elim h3 (congrArg some (_root_.id (Eq.symm h)))
+            }
+          congr 1
+          have h21_not0 : w2 - w1 ≠ 0 := by {
+            exact sub_ne_zero_of_ne fun a ↦ h1 (congrArg some (_root_.id (Eq.symm a)))
+          }
+          field_simp
+          ring
+        }
+      }
+    }
+
+
+/-
+Lemma preparing for prove exist LFT mapping three distinct point to three other distinct point
+-/
+
+
+
+/-
+  Given any three distinct points z1, z2 and z3 and any three distinct
+points w1, w2 and w3, all in the extended complex plane EComplex , there is a linear
+fractional transformation that maps z1 to w1, z2 to w2, and z3 to w3
+-/
+
+theorem exist_LFT_mapping_three_point (z1 z2 z3 w1 w2 w3 : EComplex)
+   ( hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1 )
+   ( hw : w1 ≠ w2 ∧ w2 ≠ w3 ∧ w3 ≠ w1 ) :
+ ∃ f : LinearFracTrans ,
+   f z1 = w1 ∧
+   f z2 = w2 ∧
+   f z3 = w3 := by
+   let fz := construct_lft_to0_1_infty z1 z2 z3 hz
+   let gw := construct_lft_to0_1_infty w1 w2 w3 hw
+   let compose_lft := comp (gw.inv) fz
+   use compose_lft
+   have ⟨hf1, hf2, hf3⟩ := constructlft_map_to_01infty z1 z2 z3 hz
+   unfold compose_lft
+   rw [comp_equivalent,comp_equivalent,comp_equivalent]
+   have hfz_maps := constructlft_map_to_01infty z1 z2 z3 hz
+   unfold fz
+   rcases hfz_maps with ⟨hz1,hz2,hz3⟩
+   rw [hz1,hz2,hz3]
+   have hgz_maps := proof_inv_constructlft_map_to_01infty w1 w2 w3 hw
+   rcases hgz_maps with ⟨hw1,hw2,hw3⟩
+   unfold gw
+   rw [hw1,hw2,hw3]
+   trivial
+
+
+>>>>>>> Stashed changes
 -- Define the scalar multiplication (Action)
 -- This enables the usage of `f • z` instead of `f z`
 instance : SMul LinearFracTrans EComplex where
@@ -2209,6 +2653,968 @@ instance : MulAction LinearFracTrans EComplex where
 -- #synth MulAction LinearFracTrans EComplex
 
 
+<<<<<<< Updated upstream
+=======
+--Define when two LFTs have proportional coefficients
+
+def Proportional (f1 f2 : LinearFracTrans) : Prop :=
+  ∃ (k : ℂ) , k ≠ 0 ∧
+    f2.a = k * f1.a ∧
+    f2.b = k * f1.b ∧
+    f2.c = k * f1.c ∧
+    f2.d = k * f1.d
+
+--Define when two LFTs give the same result for all inputs:
+
+def FunEq (f1 f2 : LinearFracTrans) : Prop :=
+  ∀ z : EComplex, f1 z = f2 z
+
+-- The main theorem: functional equality ↔ proportionality
+--Proportinal to FunEq
+theorem proportional2FunEq (f1 f2 : LinearFracTrans) :
+  f1.Proportional f2  →   f1.FunEq f2 := by
+    intro ⟨k, hk_ne, ha, hb, hc, hd⟩ z
+    cases z with
+    | none => {
+      unfold LinearFracTrans.apply
+      simp only
+      split_ifs with h1c_eq0 h2c_neq0 h2c_eq0
+      rfl
+      push_neg at h2c_neq0
+      rw [h1c_eq0,mul_zero] at hc
+      contradiction
+      push_neg at h1c_eq0
+      rw [h2c_eq0] at hc
+      rw[zero_eq_mul] at hc
+      rcases hc with h1 | h2
+      contradiction
+      contradiction
+      congr 1
+      rw [ha,hc]
+      field_simp
+    }
+    | some z => {
+      unfold LinearFracTrans.apply
+      simp only
+      have f1_det : f1.a * f1.d - f1.b * f1.c ≠ 0 := by exact f1.determinant_ne_zero
+      have f2_det : f2.a * f2.d - f2.b * f2.c ≠ 0 := by exact f2.determinant_ne_zero
+      split_ifs with h1c_eq0 h2c_eq0 hcd hcdeq h2c_eq02 h1c_eq02 h2c_eq03 hcd2
+      congr 1
+      rw[ha,hb,hd]
+      field_simp
+      push_neg at h2c_eq0
+      rw [h1c_eq0,mul_zero] at hc
+      contradiction
+      congr 1
+      push_neg at hcd h2c_eq0
+      field_simp
+      rw [h1c_eq0,mul_zero] at hc
+      rw [hc,mul_zero,zero_add]
+      rw[h1c_eq0,mul_zero,sub_zero] at f1_det
+      rw[hc,mul_zero,sub_zero] at f2_det
+      have f1d_neq0 : f1.d ≠ 0 := by exact EComplex.coe_ne_coe_iff.mp fun a ↦ h2c_eq0 hc
+      have f2d_neq0 : f2.d ≠ 0 := by exact EComplex.coe_ne_coe_iff.mp fun a ↦ h2c_eq0 hc
+      field_simp
+      rw [hb,ha,hd]
+      ring
+      push_neg at h1c_eq0
+      rw[h2c_eq02,zero_eq_mul] at hc
+      rcases hc
+      contradiction
+      contradiction
+      trivial
+      push_neg at h1c_eq0 h2c_eq02 h1c_eq02
+      rw [hd,hc] at h1c_eq02
+      field_simp at h1c_eq02
+      rw[neg_div'] at h1c_eq02
+      contradiction
+      rw[h2c_eq03,zero_eq_mul] at hc
+      push_neg at h1c_eq0
+      rcases hc
+      contradiction
+      contradiction
+      push_neg at hcdeq
+      rw[hc,hd] at hcd2
+      field_simp at hcd2 hcdeq
+      push_neg at h1c_eq0
+      rw[neg_div'] at hcdeq
+      rw[← propext (eq_div_iff_mul_eq h1c_eq0)] at hcd2
+      contradiction
+      congr 1
+      push_neg at h1c_eq0 hcdeq h2c_eq03 hcd2
+      rw[ha,hb,hc,hd]
+      field_simp
+    }
+
+/-If two LFTs agree everywhere, they agree on whether c = 0-/
+lemma c_zero_iff_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2) :
+    f1.c = 0 ↔ f2.c = 0 := by
+    have h_inf := h none
+    constructor
+    · {
+      intro hc1
+      simp [LinearFracTrans.apply, hc1] at h_inf
+      exact h_inf
+      }
+    · {
+      intro hc2
+      simp [LinearFracTrans.apply,hc2] at h_inf
+      exact h_inf
+      }
+
+/-From FunEq at ∞ when both c ≠ 0 : a1/c1 = a2/c2 -/
+lemma ratio_a_c_of_funEq_inf (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) :
+    f1.a / f1.c = f2.a / f2.c := by
+  have h_inf := h none
+  simp[LinearFracTrans.apply,hc1,hc2] at h_inf
+  exact (EComplex.some_eq_iff (f1.a / f1.c) (f2.a / f2.c)).mp h_inf
+
+/-From FunEq at 0 : b1/d1 = b2/d2-/
+lemma ratio_b_d_of_funEq_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hd1 : f1.d ≠ 0) (hd2 : f2.d ≠ 0) :
+    f1.b / f1.d = f2.b / f2.d := by
+  have h_zero := h (some 0)
+  simp [LinearFracTrans.apply] at h_zero
+  by_cases hf1c : f1.c =0
+  · {
+    have hf2c : f2.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mp hf1c
+    simp[hf1c,hf2c] at h_zero
+    exact (EComplex.some_eq_iff (f1.b / f1.d) (f2.b / f2.d)).mp h_zero
+    }
+  · {
+    push_neg at hf1c
+    have hf2c : f2.c ≠ 0 := by {
+      intro hcon
+      have hf1cc : f1.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mpr hcon
+      contradiction
+    }
+    simp [hf1c,hf2c] at h_zero
+    have hcd1_neq0 : 0 ≠ -f1.d / f1.c := Ne.symm (div_ne_zero (neg_ne_zero.mpr hd1) hf1c)
+    have hcd2_neq0 : 0 ≠ -f2.d / f2.c := Ne.symm (div_ne_zero (neg_ne_zero.mpr hd2) hf2c)
+    simp [hcd1_neq0,hcd2_neq0] at h_zero
+    exact (EComplex.some_eq_iff (f1.b / f1.d) (f2.b / f2.d)).mp h_zero
+    }
+
+/- From FunEq at 1-/
+lemma ratio_at_one_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hd1 : f1.c + f1.d ≠ 0) (hd2 : f2.c + f2.d ≠ 0) :
+    (f1.a + f1.b) / (f1.c + f1.d) = (f2.a + f2.b) / (f2.c + f2.d) := by
+  have h_one := h (some 1)
+  simp [LinearFracTrans.apply] at h_one
+  by_cases hf1c : f1.c = 0
+  · {
+    have hf2c : f2.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mp hf1c
+    simp [hf1c,hf2c] at h_one
+    rw[hf1c,hf2c,zero_add,zero_add]
+    have h1 := Option.some_injective ℂ h_one
+    simp only [← add_div] at h1
+    exact h1
+    }
+  · {
+    push_neg at hf1c
+    have hf2c : f2.c ≠ 0 := by {
+      intro hcc
+      have hf1cc : f1.c = 0 := by exact (c_zero_iff_of_funEq f1 f2 h).mpr hcc
+      contradiction
+    }
+    simp [hf1c,hf2c] at h_one
+    have h1 : 1 ≠ -f1.d / f1.c := fun heq => hd1 (by field_simp [hf1c] at heq; rw [heq]; ring)
+    have h2 : 1 ≠ -f2.d / f2.c := fun heq => hd2 (by field_simp [hf2c] at heq; rw [heq]; ring)
+    simp only [if_neg h1, if_neg h2] at h_one
+    have h11 := Option.some_injective ℂ h_one
+    exact h11
+    }
+
+/-- If two LFTs are FunEq and both have c ≠ 0, they have the same pole -/
+lemma pole_eq_of_funEq (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) :
+    f1.pole hc1 = f2.pole hc2 := by
+  have h_pole := h (some (-f1.d/f1.c))
+  simp only [apply] at h_pole
+  have f1_pole : f1.c * (-f1.d / f1.c) + f1.d = 0 := by {
+    field_simp
+    ring
+  }
+  simp[hc1,hc2] at h_pole
+  unfold pole
+  exact
+    (EComplex.some_eq_iff (-f1.d / f1.c) (-f2.d / f2.c)).mp
+      (congrArg EComplex.Complex.toEComplex h_pole)
+
+/-From equal poles,derive d2 = k * d1 where k = c2/c1-/
+lemma pro_d_of_pole_eq (f1 f2 : LinearFracTrans)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0)
+    (h_pole : f1.pole hc1 = f2.pole hc2) :
+    f2.d = (f2.c / f1.c) * f1.d := by
+  simp only [pole] at h_pole
+  have h : f1.d / f1.c = f2.d / f2.c := by
+    field_simp at h_pole
+    field_simp
+    simp at h_pole
+    exact h_pole
+  field_simp at h
+  field_simp
+  rw [Eq.comm,mul_comm,mul_comm f2.d f1.c]
+  exact h
+
+/-! ## Lemmas for pole that require c ≠ 0 (full Möbius case) -/
+
+/-- f(∞) = a/c when c ≠ 0 -/
+lemma apply_none (f : LinearFracTrans) (hc : f.c ≠ 0) :
+    f none = some (f.a / f.c) := by
+  simp only [apply, hc, ↓reduceIte]
+
+/-- f(w) for finite w not at pole (requires c ≠ 0) -/
+lemma apply_some_of_ne_pole (f : LinearFracTrans) (hc : f.c ≠ 0)
+    (w : ℂ) (hw : f.c * w + f.d ≠ 0) :
+    f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+  simp only [apply, hc, ↓reduceIte]
+  by_cases h : w = -f.d / f.c
+  · exfalso
+    apply hw
+    rw [h]
+    field_simp [hc]
+    simp only [neg_add_cancel, mul_zero]
+  · simp only [h, ↓reduceIte]
+
+/-- f(w) = ∞ when w is at the pole (requires c ≠ 0) -/
+lemma apply_some_of_pole (f : LinearFracTrans) (hc : f.c ≠ 0)
+    (w : ℂ) (hw : f.c * w + f.d = 0) :
+    f (some w) = none := by
+  simp only [apply, hc, ↓reduceIte]
+  have : w = -f.d / f.c := by
+    field_simp [hc] at hw
+    field_simp [hc]
+    rw [eq_neg_iff_add_eq_zero,mul_comm]
+    exact hw
+  simp only [ite_eq_left_iff, reduceCtorEq, imp_false, Decidable.not_not]
+  exact this
+
+/-- w is at pole iff w = -d/c (requires c ≠ 0) -/
+lemma pole_iff (f : LinearFracTrans) (hc : f.c ≠ 0) (w : ℂ) :
+    f.c * w + f.d = 0 ↔ w = -f.d / f.c := by
+  constructor
+  · intro h
+    field_simp [hc] at h
+    field_simp [hc]
+    rw [eq_neg_iff_add_eq_zero,mul_comm]
+    exact h
+  · intro h
+    simp [h]
+    field_simp [hc]
+    simp only [neg_add_cancel, mul_zero]
+
+
+/-- Difference of two finite images (requires c ≠ 0 for the denominator form) -/
+lemma apply_sub_apply (f : LinearFracTrans)
+    (w1 w2 : ℂ) (hw1 : f.c * w1 + f.d ≠ 0) (hw2 : f.c * w2 + f.d ≠ 0) :
+    (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+    (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+  rw [div_sub_div _ _ hw1 hw2]
+  congr 1
+  ring
+
+/-- a/c - f(w) (requires c ≠ 0) -/
+lemma apply_none_sub_apply (f : LinearFracTrans) (hc : f.c ≠ 0)
+    (w : ℂ) (hw : f.c * w + f.d ≠ 0) :
+    f.a / f.c - (f.a * w + f.b) / (f.c * w + f.d) =
+    (f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+  field_simp [hc, hw]
+  ring
+
+/-- f(w) - a/c (requires c ≠ 0) -/
+lemma apply_sub_apply_none (f : LinearFracTrans) (hc : f.c ≠ 0)
+    (w : ℂ) (hw : f.c * w + f.d ≠ 0) :
+    (f.a * w + f.b) / (f.c * w + f.d) - f.a / f.c =
+    -(f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+  field_simp [hc, hw]
+  rw [mul_comm] at hw
+  field_simp [hw]
+  ring_nf
+
+/-- If w1 ≠ w2 and w1 is at pole, then w2 is not at pole (requires c ≠ 0) -/
+lemma ne_pole_of_ne_of_pole (f : LinearFracTrans) (hc : f.c ≠ 0)
+    (w1 w2 : ℂ) (hne : w1 ≠ w2) (hw1 : f.c * w1 + f.d = 0) :
+    f.c * w2 + f.d ≠ 0 := by
+  intro h
+  have eq2 : w2 = -f.d / f.c := by
+    field_simp [hc] at h
+    field_simp [hc]
+    rw [eq_neg_iff_add_eq_zero,mul_comm]
+    exact h
+  have eq1 : w1 = -f.d / f.c := by
+    field_simp [hc] at hw1
+    field_simp [hc]
+    rw [eq_neg_iff_add_eq_zero,mul_comm]
+    exact hw1
+  exact hne (by rw [eq1, eq2])
+
+/-! ## Lemmas for c = 0 (affine case) -/
+
+/-- When c = 0, d ≠ 0 (from determinant) -/
+lemma d_ne_zero_of_c_zero (f : LinearFracTrans) (hc : f.c = 0) : f.d ≠ 0 := by
+  intro hd
+  have := f.determinant_ne_zero
+  simp only [hc, hd, mul_zero, sub_zero] at this
+  contradiction
+
+/-- When c = 0, a ≠ 0 (from determinant) -/
+lemma a_ne_zero_of_c_zero (f : LinearFracTrans) (hc : f.c = 0) : f.a ≠ 0 := by
+  intro ha
+  have := f.determinant_ne_zero
+  simp only [hc, ha, zero_mul, mul_zero, zero_sub] at this
+  rw[neg_ne_zero] at this
+  contradiction
+
+/-- f(∞) = ∞ when c = 0 -/
+lemma apply_none_of_c_zero (f : LinearFracTrans) (hc : f.c = 0) :
+    f none = none := by
+  simp only [apply, hc, ↓reduceIte]
+
+/-- f(w) = (a/d)w + (b/d) when c = 0 -/
+lemma apply_some_of_c_zero (f : LinearFracTrans) (hc : f.c = 0) (w : ℂ) :
+    f (some w) = some ((f.a / f.d) * w + (f.b / f.d)) := by
+  simp only [apply, hc, ↓reduceIte]
+
+/-- Difference of affine images when c = 0 -/
+lemma apply_sub_of_c_zero (f : LinearFracTrans) (w1 w2 : ℂ) :
+    (f.a / f.d) * w1 + (f.b / f.d) - ((f.a / f.d) * w2 + (f.b / f.d)) =
+    (f.a / f.d) * (w1 - w2) := by
+  ring
+
+
+
+/-Main case when both c ≠ 0-/
+lemma proportional_of_c_ne_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c ≠ 0) (hc2 : f2.c ≠ 0) : f1.Proportional f2 := by
+  use f2.c / f1.c
+  let k := f2.c / f1.c
+  have h1 : f2.c / f1.c ≠ 0 := by exact div_ne_zero hc2 hc1
+  constructor
+  exact h1
+  have pro_a : f2.a = k * f1.a := by {
+    have h_ac := ratio_a_c_of_funEq_inf f1 f2 h hc1 hc2
+    unfold k
+    field_simp at h_ac ⊢
+    exact
+      (EComplex.some_eq_iff (f1.c * f2.a) (f1.a * f2.c)).mp
+        (congrArg EComplex.Complex.toEComplex (_root_.id (Eq.symm h_ac)))
+  }
+
+  have pro_c : f2.c = k * f1.c := by {
+    unfold k
+    field_simp
+  }
+
+  have pro_d : f2.d = k * f1.d := by {
+    have h_same_pole := pole_eq_of_funEq f1 f2 h hc1 hc2
+    exact pro_d_of_pole_eq f1 f2 hc1 hc2 h_same_pole
+  }
+
+  have pro_b : f2.b = k * f1.b := by {
+    by_cases hd1 : f1.d = 0
+    --cases d1 = 0
+    · {
+      have hd2 : f2.d =0 := by simp [pro_d,hd1]
+      have h_one := h (some 1)
+      simp only [apply] at h_one
+      have hcd1 : 1 ≠  -f1.d / f1.c := by simp [hd1]
+      have hcd2 : 1 ≠  -f2.d / f2.c := by simp [hd2]
+      simp [ hc1,hc2,hcd1,hcd2] at h_one
+      have h_eq := Option.some_injective ℂ h_one
+      simp [hd1,hd2] at h_eq
+      have h_cross : (f1.a + f1.b) * f2.c = (f2.a + f2.b) * f1.c := by
+        field_simp [hc1,hc2] at h_eq
+        rw[mul_comm (f2.a + f2.b) f1.c]
+        exact h_eq
+      field_simp [hc1] at h_cross ⊢
+      rw [pro_a,pro_c] at h_cross
+      unfold k at h_cross
+      field_simp at h_cross
+      rw [add_mul,add_left_cancel_iff] at h_cross
+      unfold k
+      field_simp
+      rw[Eq.comm,mul_comm f2.b _]
+      exact h_cross
+      }
+    --cases d1 ≠ 0
+    · {
+      push_neg at hd1
+      have hk : f2.c / f1.c ≠ 0 := div_ne_zero hc2 hc1
+      have hd2 : f2.d ≠ 0 := by
+        rw [pro_d]
+        exact mul_ne_zero hk hd1
+      have h_zero := h (some 0)
+      simp only [apply] at h_zero
+      have hz1 : 0 ≠  -f1.d / f1.c := by {
+        by_contra h
+        field_simp at h
+        rw[zero_mul,eq_neg_iff_add_eq_zero,zero_add] at h
+        contradiction
+      }
+      have hz2 : 0 ≠  -f2.d / f2.c := by {
+        by_contra h
+        field_simp at h
+        rw[zero_mul,eq_neg_iff_add_eq_zero,zero_add] at h
+        contradiction
+      }
+      simp [hc1,hc2,hz1,hz2] at h_zero
+      have h_bd := Option.some_injective ℂ h_zero
+      have h_cross : f1.b * f2.d = f2.b * f1.d := by
+        field_simp [hd1, hd2] at h_bd
+        rw[mul_comm f1.d _] at h_bd
+        exact h_bd
+      rw [pro_d] at h_cross
+      field_simp [hd1] at h_cross ⊢
+      rw[Eq.comm]
+      exact h_cross
+      }
+  }
+  unfold k at pro_a pro_b pro_c pro_d
+  constructor
+  exact pro_a
+  constructor
+  exact pro_b
+  constructor
+  exact pro_c
+  exact pro_d
+
+/-Main case when both c = 0-/
+lemma proportional_of_c_zero (f1 f2 : LinearFracTrans) (h : f1.FunEq f2)
+    (hc1 : f1.c = 0) (hc2 : f2.c = 0) : f1.Proportional f2 := by
+  have hd1 : f1.d ≠ 0 := by
+    intro hd
+    have := f1.determinant_ne_zero
+    simp [hc1,hd] at this
+  have hd2 : f2.d ≠ 0 := by
+    intro hd
+    have := f2.determinant_ne_zero
+    simp [hc2,hd] at this
+  let k := f2.d / f1.d
+  have hk : k ≠ 0 := div_ne_zero hd2 hd1
+  use k
+  have pro_a : f2.a = k * f1.a := by {
+    have h_zero := h (some 0)
+    simp only [apply, hc1, hc2] at h_zero
+    simp at h_zero
+    have h_bd : f1.b / f1.d = f2.b / f2.d := Option.some_injective ℂ h_zero
+    have h_one := h (some 1)
+    simp only [apply, hc1, hc2] at h_one
+    simp at h_one
+    have h_sum : (f1.a + f1.b) / f1.d = (f2.a + f2.b) / f2.d := by {
+      have honeone := Option.some_injective ℂ h_one
+      field_simp at honeone
+      field_simp
+      rw [add_mul,mul_add] at honeone
+      ring_nf
+      exact honeone
+    }
+    have h_ad : f1.a / f1.d = f2.a / f2.d := by {
+      have h1 : (f1.a + f1.b) / f1.d - f1.b / f1.d = (f2.a + f2.b) / f2.d - f2.b / f2.d := by
+        rw [h_sum, h_bd]
+      simp only [add_div, add_sub_cancel_right] at h1
+      exact h1
+    }
+    field_simp [hd1]
+    have h_cross : f1.a * f2.d = f2.a * f1.d := by
+      field_simp [hd1, hd2] at h_ad
+      rw[mul_comm f1.d _] at h_ad
+      exact h_ad
+    unfold k
+    field_simp
+    rw[Eq.comm,mul_comm f2.d _ ]
+    exact h_cross
+  }
+  have pro_b : f2.b = k * f1.b := by {
+    have h_zero := h (some 0)
+    simp only [apply, hc1, hc2] at h_zero
+    simp at h_zero
+    have h_bd := Option.some_injective ℂ h_zero
+    have h_bd_cross : f1.b * f2.d = f2.b * f1.d := by
+      field_simp [hd1, hd2] at h_bd
+      rw [mul_comm f2.b _]
+      exact h_bd
+    field_simp [hd1]
+    unfold k
+    field_simp
+    rw[Eq.comm,mul_comm f2.d _]
+    exact h_bd_cross
+  }
+  have pro_c : f2.c = k * f1.c := by {
+    simp [hc1,hc2]
+  }
+  have pro_d : f2.d = k * f1.d := by {
+    simp only [k]
+    field_simp
+  }
+  constructor
+  exact hk
+  constructor
+  exact pro_a
+  constructor
+  exact pro_b
+  constructor
+  exact pro_c
+  exact pro_d
+
+/---FunEq to Proportional-/
+theorem FunEq2proportional (f1 f2 : LinearFracTrans) (h : f1.FunEq f2) :
+    f1.Proportional f2 := by
+  have hc_equiv : f1.c = 0 ↔ f2.c = 0 := c_zero_iff_of_funEq f1 f2 h
+  by_cases hc1 : f1.c = 0
+  · have hc2 : f2.c = 0 := hc_equiv.mp hc1
+    exact proportional_of_c_zero f1 f2 h hc1 hc2
+  · have hc2 : f2.c ≠ 0 := fun h2 => hc1 (hc_equiv.mpr h2)
+    exact proportional_of_c_ne_zero f1 f2 h hc1 hc2
+
+/-- Two LFTs are functionally equal iff their coefficients are proportional -/
+theorem funEq_iff_proportional (f1 f2 : LinearFracTrans) :
+    f1.FunEq f2 ↔ f1.Proportional f2 := by
+  constructor
+  · exact fun a ↦ FunEq2proportional f1 f2 a
+  · exact fun a ↦ proportional2FunEq f1 f2 a
+
+
+-- Infinity is fixed by T iff c = 0
+lemma infty_fixed_iff (T : LinearFracTrans) :
+   T none = none ↔ T.c = 0 := by
+  simp only [apply]
+  constructor
+  · intro h
+    split_ifs at h with hc
+    · exact hc
+  · intro hc
+    simp [hc]
+
+-- Finite point fixed iff satisfies quadratic equation
+lemma finite_fixed_iff (T : LinearFracTrans) (z : ℂ) (hdenom : T.c * z + T.d ≠ 0) :
+    T (some z) = some z ↔ T.c * z ^2 + (T.d -T.a) * z - T.b = 0 := by
+  simp only [apply]
+  split_ifs with h hneg
+  · {
+    constructor
+    intro hsome
+    injection hsome with hsome
+    rw [h,zero_mul,zero_add,sub_mul]
+    field_simp at hsome
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [h,mul_zero,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha,hd⟩
+    field_simp at hsome
+    rw[sub_eq_zero,sub_eq_iff_eq_add',mul_comm,Eq.comm]
+    exact hsome
+    intro hzero
+    rw [h,zero_mul,zero_add,sub_mul] at hzero
+    congr 1
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [h,mul_zero,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha,hd⟩
+    field_simp
+    rw [sub_eq_zero,sub_eq_iff_eq_add',Eq.comm] at hzero
+    exact hzero
+    }
+  · {
+    push_neg at h
+    constructor
+    simp
+    intro hzero
+    field_simp at hneg
+    rw [← propext (eq_div_iff_mul_eq h)] at hneg
+    rw [hneg] at hzero
+    field_simp at hzero
+    ring_nf at hzero
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [mul_comm,mul_comm T.b _] at det_not_zero
+    exact Ne.elim det_not_zero hzero
+    }
+  · {
+    push_neg at h hneg
+    constructor
+    intro hsome
+    injection hsome with hsome
+    rw [mul_comm] at hdenom
+    field_simp at hsome
+    rw[mul_add] at hsome
+    rw [sub_mul,add_sub,sub_eq_iff_eq_add',add_zero,sub_eq_iff_eq_add',hsome]
+    ring_nf
+    intro hsome
+    congr 1
+    rw [sub_eq_zero,Eq.comm] at hsome
+    apply (div_eq_iff hdenom).2
+    rw [hsome]
+    ring_nf
+    }
+
+-- Coefficient conditions imply functional identity
+lemma coeff_id_implies_fun_id (T : LinearFracTrans)
+    (hc : T.c = 0) (ha : T.a = T.d) (hb : T.b = 0) :
+    FunEq T id := by
+  have proportional_T_id : T.Proportional id := by
+    unfold Proportional
+    have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+    rw [hb,zero_mul,sub_zero,mul_ne_zero_iff] at det_not_zero
+    rcases det_not_zero with ⟨ha_neg,hd_neg⟩
+    use 1/T.a
+    constructor
+    exact one_div_ne_zero ha_neg
+    constructor
+    rw [one_div_mul_cancel ha_neg]
+    rfl
+    constructor
+    rw [hb,mul_zero]
+    rfl
+    constructor
+    rw[hc,mul_zero]
+    rfl
+    rw [ha,one_div_mul_cancel]
+    rfl
+    exact hd_neg
+  exact proportional2FunEq T id proportional_T_id
+
+
+-- Key algebraic fact: a quadratic cz² + ez + f = 0 with c ≠ 0
+-- has at most 2 solutions
+lemma quadratic_at_most_two_roots (c e f : ℂ) (hc : c ≠ 0)
+    (z1 z2 z3 : ℂ) (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z1 ≠ z3)
+    (h1 : c * z1^2 + e * z1 + f = 0)
+    (h2 : c * z2^2 + e * z2 + f = 0)
+    (h3 : c * z3^2 + e * z3 + f = 0) :
+    False := by
+  have key12 : c * (z1 + z2) + e = 0 := by
+    have hsub : c * z1^2 + e * z1 + f - (c * z2^2 + e * z2 + f) = 0 := by
+      rw [h1,h2]; ring
+    have hfactor : (z1 - z2) * (c * (z1 + z2) + e) = 0 := by
+      calc (z1 - z2) * (c * (z1 + z2) + e)
+          = c * z1^2 - c * z2^2 + e * z1 - e * z2 := by ring
+        _ = c * z1^2 + e * z1 + f - (c * z2^2 + e * z2 + f) := by ring
+        _ = 0 := hsub
+    have hz12 : z1 - z2 ≠ 0 := sub_ne_zero.mpr hdist.1
+    exact (mul_eq_zero_iff_left hz12).mp hfactor
+  have key13 : c * (z1 + z3) + e = 0 := by
+    have hsub : c * z1^2 + e * z1 + f - (c * z3^2 + e * z3 + f) = 0 := by
+      rw [h1,h3]; ring
+    have hfactor : (z1 - z3) * (c * (z1 + z3) + e) = 0 := by
+      calc (z1 - z3) * (c * (z1 + z3) + e)
+          = c * z1^2 - c * z3^2 + e * z1 - e * z3 := by ring
+        _ = c * z1^2 + e * z1 + f - (c * z3^2 + e * z3 + f) := by ring
+        _ = 0 := hsub
+    have hz13 : z1 - z3 ≠ 0 := sub_ne_zero.mpr hdist.2.2
+    exact (mul_eq_zero_iff_left hz13).mp hfactor
+  have heq : c * (z1 + z2) = c * (z1 + z3) := by
+    calc c * (z1 + z2) = -e := by exact Eq.symm (neg_eq_of_add_eq_zero_left key12)
+    _ = c * (z1 + z3) := by exact neg_eq_of_add_eq_zero_left key13
+  have this1 : z1 + z2 = z1 + z3 := by
+    have := mul_left_cancel₀ hc heq
+    exact this
+  have this2 : z2 = z3 := add_left_cancel this1
+  exact hdist.2.1 this2
+
+-- When c = 0: the "quadratic" (d-a)z - b = 0 is linear
+-- If d ≠ a, it has exactly one root
+-- If d = a and b ≠ 0, it has no roots
+-- If d = a and b = 0, every z is a root
+lemma linear_two_roots_implies_trivial (e f : ℂ)
+    (z1 z2 : ℂ) (hdist : z1 ≠ z2)
+    (h1 : e * z1 + f = 0)
+    (h2 : e * z2 + f = 0) :
+    e = 0 ∧ f = 0 := by
+  have hsub : e * z1 + f - (e * z2 + f) = 0 := by rw [h1,h2]; ring
+  have : e * (z1 - z2) = 0 := by {
+    rw [mul_sub]
+    ring_nf at hsub
+    exact hsub
+  }
+  have he : e = 0 := by
+    by_contra hne
+    have : z1 - z2 = 0 := by
+      have := mul_eq_zero.mp this
+      exact this.resolve_left hne
+    exact hdist (sub_eq_zero.mp this)
+  have hf : f = 0 := by
+      calc f = e * z1 + f := by rw [he]; ring_nf
+         _ = 0 := h1
+  exact ⟨he , hf⟩
+
+
+/-!
+We prove this by case analysis on whether ∞ is one of the fixed points.
+-/
+
+-- Case 1: All three fixed points are finite
+lemma fixes_three_finite_is_id (T : LinearFracTrans) (z1 z2 z3 : ℂ)
+    (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z1 ≠ z3)
+    (hfix1 : T (some z1) = some z1)
+    (hfix2 : T (some z2) = some z2)
+    (hfix3 : T (some z3) = some z3) :
+    FunEq T id := by
+  have hdenom1 : T.c * z1 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix1
+    split_ifs at hfix1 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z1 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hdenom2 : T.c * z2 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix2
+    split_ifs at hfix2 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z2 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hdenom3 : T.c * z3 + T.d ≠ 0 := by
+    intro h
+    simp only [apply] at hfix3
+    split_ifs at hfix3 with h1 h2
+    · {
+      rw [h1,zero_mul,zero_add] at h
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      rw [h1,h,mul_zero,mul_zero,zero_sub] at det_not_zero
+      rw[neg_ne_zero] at det_not_zero
+      contradiction
+      }
+    · {
+      have det_not_zero : T.a * T.d - T.b * T.c ≠ 0 := by exact T.determinant_ne_zero
+      push_neg at h1 h2
+      have : z3 * T.c ≠ -T.d :=by {
+        contrapose! h2
+        field_simp [h1]
+        exact h2
+      }
+      rw[add_eq_zero_iff_neg_eq',mul_comm,Eq.comm] at h
+      contradiction
+      }
+  have hquad1 : T.c * z1^2 + (T.d - T.a) * z1 - T.b = 0 := by
+    rw [finite_fixed_iff T z1 hdenom1] at hfix1
+    exact hfix1
+  have hquad2 : T.c * z2^2 + (T.d - T.a) * z2 - T.b = 0 := by
+    rw [finite_fixed_iff T z2 hdenom2] at hfix2
+    exact hfix2
+  have hquad3 : T.c * z3^2 + (T.d - T.a) * z3 - T.b = 0 := by
+    rw [finite_fixed_iff T z3 hdenom3] at hfix3
+    exact hfix3
+  have hc : T.c = 0 := by
+    by_contra hc_ne
+    exact quadratic_at_most_two_roots T.c (T.d - T.a) (-T.b) hc_ne
+      z1 z2 z3 hdist hquad1 hquad2 hquad3
+  have hlin1 : (T.d - T.a) * z1 - T.b = 0 := by
+    simp only [hc,zero_mul,zero_add] at hquad1
+    exact hquad1
+  have hlin2 : (T.d - T.a) * z2 - T.b = 0 := by
+    simp only [hc, zero_mul, zero_add] at hquad2
+    exact hquad2
+  have hcoeffs : T.d - T.a = 0 ∧ T.b = 0 := by
+    rw [sub_eq_add_neg] at hlin1
+    rw [sub_eq_add_neg] at hlin2
+    have : T.d - T.a = 0 ∧ -T.b = 0 := by {
+      apply linear_two_roots_implies_trivial (T.d - T.a) (-T.b) z1 z2 hdist.1 hlin1 hlin2
+    }
+    rcases this with ⟨h1,h2⟩
+    constructor
+    exact h1
+    exact neg_eq_zero.mp h2
+  have ha : T.a = T.d := by {
+    rcases hcoeffs with ⟨h1,h2⟩
+    rw [sub_eq_zero,Eq.comm] at h1
+    exact h1
+  }
+  have hb : T.b = 0 := by {
+    rcases hcoeffs with ⟨h1,h2⟩
+    exact h2
+  }
+  exact coeff_id_implies_fun_id T hc ha hb
+
+
+-- Case 2: ∞ is one of the fixed points
+-- If T(∞) = ∞, then c = 0, so T(z) = (az + b)/d
+-- Then T(z) = z means az + b = dz, i.e., (a - d)z + b = 0
+lemma fixes_infty_and_two_finite_is_id (T : LinearFracTrans) (z1 z2 : ℂ)
+    (hdist : z1 ≠ z2)
+    (hfix_infty : T none = none)
+    (hfix1 : T (some z1) = some z1)
+    (hfix2 : T (some z2) = some z2) :
+    FunEq T id := by
+    have hc : T.c = 0 := by exact (infty_fixed_iff T).mp hfix_infty
+    have hd_ne : T.d ≠ 0 := fun hd => T.determinant_ne_zero (by simp [hc, hd])
+    have hd1 : T.c * z1 + T.d ≠ 0 := by simp [hc, hd_ne]
+    have hd2 : T.c * z2 + T.d ≠ 0 := by simp [hc,hd_ne]
+    have h1 : (T.d - T.a) * z1 = T.b := by
+      have := (finite_fixed_iff T z1 hd1).mp hfix1
+      simp [hc] at this
+      rw [sub_eq_zero] at this
+      exact this
+    have h2 : (T.d - T.a) * z2 = T.b := by
+      have := (finite_fixed_iff T z2 hd2).mp hfix2
+      simp [hc] at this
+      rw [sub_eq_zero] at this
+      exact this
+    have ha : T.a = T.d := by
+      by_contra hne
+      have : z1 = z2 := by
+        field_simp[sub_ne_zero.mpr (Ne.symm hne)] at h1 h2
+        have eq : (T.d - T.a) * z1 = (T.d - T.a) * z2 := by rw [h1, h2]
+        have : (T.d - T.a) * (z1 - z2) = 0 := by rw [mul_sub, eq, sub_self]
+        have hneq : T.d - T.a ≠ 0 := by
+          contrapose! hne
+          rw [sub_eq_zero,Eq.comm] at hne
+          exact hne
+        rw [propext (mul_eq_zero_iff_left hneq),sub_eq_zero] at this
+        exact this
+      exact hdist this
+    have hb : T.b = 0 := by
+      simp [ha] at h1
+      rw[Eq.comm]
+      exact h1
+    intro z
+    cases z with
+    | none => {
+      simp [apply,hc,id]
+    }
+    | some z => {
+      simp only [apply,id]
+      simp only [hc,zero_mul,zero_add,ha,hb,add_zero]
+      simp
+      congr 1
+      field_simp
+    }
+
+
+-- Key lemma: LFT fixing three distinct points is the identity
+-- If T(zᵢ) = zᵢ for three distinct points, then T is the identity
+lemma fixes_three_is_id (f : LinearFracTrans) (z1 z2 z3 : EComplex)
+    (hz : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1)
+    (hfix1 : f z1 = z1)
+    (hfix2 : f z2 = z2)
+    (hfix3 : f z3 = z3) :
+    f.FunEq id := by
+  cases z1 with
+  | some z1 => {
+    cases z2 with
+    | some z2 => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_three_finite_is_id f z1 z2 z3
+        · exact ⟨mt (congrArg some) hz.1, mt (congrArg some) hz.2.1, (mt (congrArg some) hz.2.2.symm)⟩
+        · exact hfix1
+        · exact hfix2
+        · exact hfix3
+      }
+      | none => {
+        apply fixes_infty_and_two_finite_is_id f z1 z2
+        · exact mt (congrArg some) hz.1
+        · exact hfix3
+        · exact hfix1
+        · exact hfix2
+      }
+    }
+    | none => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_infty_and_two_finite_is_id f z1 z3
+        · exact mt (congrArg some) hz.2.2.symm
+        · exact hfix2
+        · exact hfix1
+        · exact hfix3
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+  }
+  | none => {
+    cases z2 with
+    | some z2 => {
+      cases z3 with
+      | some z3 => {
+        apply fixes_infty_and_two_finite_is_id f z2 z3
+        · exact mt (congrArg some) hz.2.1
+        · exact hfix1
+        · exact hfix2
+        · exact hfix3
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+    | none => {
+      cases z3 with
+      | some z3 => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+      | none => {
+        rcases hz with ⟨h1,h2,h3⟩
+        contradiction
+      }
+    }
+  }
+
+-- Main theorem: Uniqueness of LFT determined by three points
+-- If f and g agree on three distinct points, they agree everywhere
+theorem lft_uniqueness (f g : LinearFracTrans) (z1 z2 z3 : EComplex)
+    (hdist : z1 ≠ z2 ∧ z2 ≠ z3 ∧ z3 ≠ z1)
+    (h1 : f z1 = g z1)
+    (h2 : f z2 = g z2)
+    (h3 : f z3 = g z3) :
+    FunEq f g := by
+  -- Strategy: show that g⁻¹ ∘ f fixes z₁, z₂, z₃
+  -- Then by fixes_three_is_id, g⁻¹ ∘ f = id
+  -- Therefore f = g
+  let h := comp (inv g) f
+  have hfix1 : h z1 = z1 := by
+    simp only [h]
+    rw [comp_equivalent,h1,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z1
+  have hfix2 : h z2 = z2 := by
+    simp only [h]
+    rw [comp_equivalent,h2,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z2
+  have hfix3 : h z3 = z3 := by
+    simp only [h]
+    rw [comp_equivalent,h3,← comp_equivalent,lft_mul_left_inv]
+    exact id_apply z3
+  have h_is_id : FunEq h id := fixes_three_is_id h z1 z2 z3 hdist hfix1 hfix2 hfix3
+  intro z
+  have : h z = id z := h_is_id z
+  simp only [h,comp_equivalent,id_apply] at this
+  calc f z
+      = g.apply ((inv g).apply (f.apply z)) := by rw [← comp_equivalent,lft_mul_right_inv,id_apply]
+    _ = g.apply z := by rw [this]
+
+
+>>>>>>> Stashed changes
 example (f : LinearFracTrans) (z : EComplex) :
   f • z = f z := rfl
 
@@ -2228,8 +3634,6 @@ example (z : EComplex) :
   apply one_smul
 
 
-
-
 end LinearFracTrans
 
 
@@ -2246,7 +3650,7 @@ It follows the standard formula when z1, z2, z3 are finite, and special limiting
 open Complex
 
 namespace EComplex
-
+namespace CrossRatio
 /-
 Definition of cross ratio
 -/
@@ -2274,23 +3678,1605 @@ theorem cross_ratio_finite (z0 z1 z2 z3 : ℂ) :
   rfl
 
 theorem cross_ratio_z1_infty (z0 z2 z3 : ℂ) :
-  cross_ratio z0 EComplex.infty z2 z3 = (z2 - z3) / (z0 - z3) := by
+  cross_ratio z0 none z2 z3 = (z2 - z3) / (z0 - z3) := by
   rfl
 
 theorem cross_ratio_z2_infty (z0 z1 z3 : ℂ) :
-  cross_ratio z0 z1 EComplex.infty z3 = (z0 - z1) / (z0 - z3) := by
+  cross_ratio z0 z1 none z3 = (z0 - z1) / (z0 - z3) := by
   rfl
 
 theorem cross_ratio_z3_infty (z0 z1 z2 : ℂ) :
-  cross_ratio z0 z1 z2 EComplex.infty = (z0 - z1) / (z2 - z1) := by
+  cross_ratio z0 z1 z2 none = (z0 - z1) / (z2 - z1) := by
   rfl
 
+/-! ## Cross ratio simplification lemmas matching your definition -/
+
+-- All finite points
+lemma cross_ratio_some (z0 z1 z2 z3 : ℂ) :
+    cross_ratio (some z0) (some z1) (some z2) (some z3) =
+    (some z0 - some z1) / (some z0 - some z3) * ((some z2 - some z3) / (some z2 - some z1)) := by
+  simp only [cross_ratio]
+
+-- z0 = ∞ (none)
+lemma cross_ratio_none_z0 (z1 z2 z3 : ℂ) :
+    cross_ratio none (some z1) (some z2) (some z3) =
+    (some z2 - some z3) / (some z2 - some z1) := by
+  simp only [cross_ratio]
+
+-- z1 = ∞ (none)
+lemma cross_ratio_none_z1 (z0 z2 z3 : ℂ) :
+    cross_ratio (some z0) none (some z2) (some z3) =
+    (some z2 - some z3) / (some z0 - some z3) := by
+  simp only [cross_ratio]
+
+-- z2 = ∞ (none)
+lemma cross_ratio_none_z2 (z0 z1 z3 : ℂ) :
+    cross_ratio (some z0) (some z1) none (some z3) =
+    (some z0 - some z1) / (some z0 - some z3) := by
+  simp only [cross_ratio]
+
+-- z3 = ∞ (none)
+lemma cross_ratio_none_z3 (z0 z1 z2 : ℂ) :
+    cross_ratio (some z0) (some z1) (some z2) none =
+    (some z0 - some z1) / (some z2 - some z1) := by
+  simp only [cross_ratio]
+
+/-! ## Extracting distinctness hypotheses from List.Pairwise -/
+
+lemma pairwise_distinct_0_1 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z0 ≠ z1 := by
+  rw [List.pairwise_cons] at h
+  have h01 := h.left z1
+  apply h01
+  exact List.mem_cons_self
 
 
+lemma pairwise_distinct_0_2 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z0 ≠ z2 := by
+  rw [List.pairwise_cons] at h
+  have h02 := h.left z2
+  apply h02
+  refine List.mem_cons_of_mem z1 ?_
+  exact List.mem_cons_self
+
+
+lemma pairwise_distinct_0_3 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z0 ≠ z3 := by
+  rw [List.pairwise_cons] at h
+  have h03 := h.left z3
+  apply h03
+  exact List.mem_of_getLast? rfl
+
+
+lemma pairwise_distinct_1_2 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z1 ≠ z2 := by
+  rw [List.pairwise_cons] at h
+  have h_tail := h.right
+  rw [List.pairwise_cons] at h_tail
+  have h12 := h_tail.left z2
+  apply h12
+  exact List.mem_cons_self
+
+lemma pairwise_distinct_1_3 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z1 ≠ z3 := by
+  rw [List.pairwise_cons] at h
+  have h_tail := h.right
+  rw [List.pairwise_cons] at h_tail
+  have h13 := h_tail.left z3
+  apply h13
+  exact List.mem_of_getLast? rfl
+
+lemma pairwise_distinct_2_3 {z0 z1 z2 z3 : EComplex}
+    (h : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) : z2 ≠ z3 := by
+  rw [List.pairwise_cons] at h
+  have h1 := h.right
+  rw [List.pairwise_cons] at h1
+  have h2 := h1.right
+  rw [List.pairwise_cons] at h2
+  have h23 := h2.left z3
+  apply h23
+  exact List.mem_singleton.mpr rfl
+
+/-! ## Cross ratio definition and basic properties -/
+
+
+/-! ## Cross ratio in terms of ℂ (unwrapped) -/
+
+lemma cross_ratio_some_eq (z0 z1 z2 z3 : ℂ)
+    (h03 : z0 ≠ z3) (h21 : z2 ≠ z1) :
+    cross_ratio (some z0) (some z1) (some z2) (some z3) =
+    some ((z0 - z1) / (z0 - z3) * ((z2 - z3) / (z2 - z1))) := by
+  simp only [cross_ratio]
+  rw [EComplex.sub_some, EComplex.sub_some, EComplex.sub_some, EComplex.sub_some]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h03)]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h21)]
+  rw [EComplex.mul_some]
+
+lemma cross_ratio_none_z0_eq (z1 z2 z3 : ℂ) (h21 : z2 ≠ z1) :
+    cross_ratio none (some z1) (some z2) (some z3) =
+    some ((z2 - z3) / (z2 - z1)) := by
+  simp only [cross_ratio]
+  rw [EComplex.sub_some, EComplex.sub_some]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h21)]
+
+lemma cross_ratio_none_z1_eq (z0 z2 z3 : ℂ) (h03 : z0 ≠ z3) :
+    cross_ratio (some z0) none (some z2) (some z3) =
+    some ((z2 - z3) / (z0 - z3)) := by
+  simp only [cross_ratio]
+  rw [EComplex.sub_some, EComplex.sub_some]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h03)]
+
+lemma cross_ratio_none_z2_eq (z0 z1 z3 : ℂ) (h03 : z0 ≠ z3) :
+    cross_ratio (some z0) (some z1) none (some z3) =
+    some ((z0 - z1) / (z0 - z3)) := by
+  simp only [cross_ratio]
+  rw [EComplex.sub_some, EComplex.sub_some]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h03)]
+
+lemma cross_ratio_none_z3_eq (z0 z1 z2 : ℂ) (h21 : z2 ≠ z1) :
+    cross_ratio (some z0) (some z1) (some z2) none =
+    some ((z0 - z1) / (z2 - z1)) := by
+  simp only [cross_ratio]
+  rw [EComplex.sub_some, EComplex.sub_some]
+  rw [EComplex.div_some _ _ (sub_ne_zero.mpr h21)]
+
+
+/-! ## Core algebraic identity for invariance -/
+
+-- The key identity: after applying LFT, cross ratio formula simplifies
+-- Using your formula: (z0-z1)/(z0-z3) * (z2-z3)/(z2-z1)
+
+lemma cross_ratio_lft_num_denom (f : LinearFracTrans) (z0 z1 z2 z3 : ℂ)
+    (h0 : f.c * z0 + f.d ≠ 0) (h1 : f.c * z1 + f.d ≠ 0)
+    (h2 : f.c * z2 + f.d ≠ 0) (h3 : f.c * z3 + f.d ≠ 0) :
+    let fz0 := (f.a * z0 + f.b) / (f.c * z0 + f.d)
+    let fz1 := (f.a * z1 + f.b) / (f.c * z1 + f.d)
+    let fz2 := (f.a * z2 + f.b) / (f.c * z2 + f.d)
+    let fz3 := (f.a * z3 + f.b) / (f.c * z3 + f.d)
+    (fz0 - fz1) / (fz0 - fz3) * ((fz2 - fz3) / (fz2 - fz1)) =
+    (z0 - z1) / (z0 - z3) * ((z2 - z3) / (z2 - z1)) := by
+  -- Use apply_sub_apply on each difference
+  have det := f.determinant_ne_zero
+  simp only []
+  rw [LinearFracTrans.apply_sub_apply f z0 z1 h0 h1]
+  rw [LinearFracTrans.apply_sub_apply f z0 z3 h0 h3]
+  rw [LinearFracTrans.apply_sub_apply f z2 z3 h2 h3]
+  rw [LinearFracTrans.apply_sub_apply f z2 z1 h2 h1]
+  have hp01 : (f.c * z0 + f.d) * (f.c * z1 + f.d) ≠ 0 := mul_ne_zero h0 h1
+  have hp03 : (f.c * z0 + f.d) * (f.c * z3 + f.d) ≠ 0 := mul_ne_zero h0 h3
+  have hp23 : (f.c * z2 + f.d) * (f.c * z3 + f.d) ≠ 0 := mul_ne_zero h2 h3
+  have hp21 : (f.c * z2 + f.d) * (f.c * z1 + f.d) ≠ 0 := mul_ne_zero h2 h1
+  field_simp [det, hp01, hp03, hp23, hp21]
+
+
+
+
+theorem cross_ratio_invariant (f : LinearFracTrans)
+    (z0 z1 z2 z3 : EComplex)
+    (h_distinct : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) :
+    cross_ratio (f z0) (f z1) (f z2) (f z3) =
+    cross_ratio z0 z1 z2 z3 := by
+  have h01 : z0 ≠ z1 := pairwise_distinct_0_1 h_distinct
+  have h02 : z0 ≠ z2 := pairwise_distinct_0_2 h_distinct
+  have h03 : z0 ≠ z3 := pairwise_distinct_0_3 h_distinct
+  have h12 : z1 ≠ z2 := pairwise_distinct_1_2 h_distinct
+  have h13 : z1 ≠ z3 := pairwise_distinct_1_3 h_distinct
+  have h23 : z2 ≠ z3 := pairwise_distinct_2_3 h_distinct
+  -- Split on c = 0 vs c ≠ 0
+  by_cases hc : f.c = 0
+  ·-- ═══════════════════════════════════════════════════════════════
+   -- CASE A: c = 0 (affine transformation)
+   -- f(z) = (a/d)z + (b/d), f(∞) = ∞
+   -- ═══════════════════════════════════════════════════════════════
+   --establish d ≠ 0
+    have hd : f.d ≠ 0 := by
+      intro hd_zero
+      have := f.determinant_ne_zero
+      simp only [hc,hd_zero,mul_zero,sub_zero] at this
+      exact false_of_ne this
+    --Also a ≠ 0
+    have ha : f.a ≠ 0 := by
+      intro ha_zero
+      have := f.determinant_ne_zero
+      simp only [hc,ha_zero,zero_mul,mul_zero,zero_sub,neg_zero] at this
+      exact false_of_ne this
+    --Lemma : apply when c = 0 and z is finite
+    have apply_affine_finite : ∀ w : ℂ , f (some w) = some ((f.a / f.d) * w + (f.b / f.d)) := by
+      intro w
+      simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+      exact (congrArg Option.some ∘ congrArg (HAdd.hAdd (f.a / f.d * w))) rfl
+    --Lemma : apply when c = 0 and z is ∞
+    have apply_affine_inf : f none = none := by
+      simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+    have affine_sub : ∀ w1 w2 : ℂ,
+         (f.a / f.d) * w1 + (f.b / f.d) - ((f.a / f.d) * w2 + (f.b / f.d)) =
+         (f.a / f.d) * (w1 - w2) := by
+      intro w1 w2
+      ring
+    -- Now case split on which points are ∞
+    match z0, z1, z2, z3 with
+    | some w0, some w1, some w2, some w3 =>
+      --all Finite
+      simp only [ne_eq] at h01 h02 h03 h12 h13 h23
+      rw [apply_affine_finite w0, apply_affine_finite w1,
+          apply_affine_finite w2, apply_affine_finite w3]
+      rw [cross_ratio_some_eq, cross_ratio_some_eq]
+      have had : f.a / f.d ≠ 0 := div_ne_zero ha hd
+      simp only [affine_sub]
+      field_simp [had]
+      exact coe_ne_coe_iff.mp h03
+      exact coe_ne_coe_iff.mp fun a ↦ h12 (id (Eq.symm a))
+      intro heq
+      field_simp at heq
+      rw [add_right_cancel_iff,mul_comm,mul_comm f.a w3] at heq
+      have h_eq : w0 = w3 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h03 (congrArg some h_eq)
+      intro heq
+      field_simp at heq
+      rw [add_right_cancel_iff,mul_comm,mul_comm f.a w1] at heq
+      have h_eq : w2 = w1 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h12 (congrArg some (id (Eq.symm h_eq)))
+
+    | none, some w1, some w2, some w3 =>
+      -- z0 = ∞
+      simp only [ne_eq] at h12 h13 h23
+      rw [apply_affine_inf, apply_affine_finite w1,
+          apply_affine_finite w2, apply_affine_finite w3]
+      rw [cross_ratio_none_z0_eq, cross_ratio_none_z0_eq]
+      -- Goal: (a/d)(w2-w3) / (a/d)(w2-w1) = (w2-w3) / (w2-w1)
+      have had : f.a / f.d ≠ 0 := div_ne_zero ha hd
+      simp only [affine_sub]
+      field_simp [had]
+      exact coe_ne_coe_iff.mp fun a ↦ h12 (id (Eq.symm a))
+      intro heq
+      field_simp at heq
+      rw [add_right_cancel_iff,mul_comm,mul_comm f.a w1] at heq
+      have h_eq : w2 = w1 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h12 (congrArg some (id (Eq.symm h_eq)))
+
+    | some w0, none, some w2, some w3 =>
+      -- z1 = ∞
+      simp only [ne_eq] at h02 h03 h23
+      rw [apply_affine_inf, apply_affine_finite w0,
+          apply_affine_finite w2, apply_affine_finite w3]
+      rw [cross_ratio_none_z1_eq, cross_ratio_none_z1_eq]
+      congr 1
+      field_simp
+      have w03_neq0 : w0 - w3 ≠ 0 := by exact sub_ne_zero_of_ne fun a ↦ h03 (congrArg some a)
+      have denomi_neq0 :  (f.a * w0 + f.b - (f.a * w3 + f.b)) ≠ 0 := by {
+        intro heq
+        ring_nf at heq
+        rw[sub_eq_zero,mul_comm,mul_comm _ w3] at heq
+        have w01_eq : w0 = w3 := by exact mul_right_cancel₀ ha heq
+        exact Ne.elim h03 (congrArg some w01_eq)
+      }
+      field_simp [w03_neq0,denomi_neq0]
+      ring_nf
+      exact coe_ne_coe_iff.mp h03
+      intro heq
+      field_simp at heq
+      rw[add_right_cancel_iff,mul_comm,mul_comm f.a w3] at heq
+      have h_eq : w0 = w3 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h03 (congrArg some h_eq)
+
+
+    | some w0, some w1, none, some w3 =>
+      -- z2 = ∞
+      simp only [ne_eq] at h01 h03 h13
+      rw [apply_affine_inf, apply_affine_finite w0,
+          apply_affine_finite w1, apply_affine_finite w3]
+      rw [cross_ratio_none_z2_eq, cross_ratio_none_z2_eq]
+      congr 1
+      field_simp
+      have w03_neq0 : w0 - w3 ≠ 0 := by exact sub_ne_zero_of_ne fun a ↦ h03 (congrArg some a)
+      have denomi1_neq0 : (f.a * w0 + f.b - (f.a * w3 + f.b)) ≠ 0 := by
+        intro heq
+        ring_nf at heq
+        rw[sub_eq_zero, mul_comm, mul_comm _ w3] at heq
+        have h_eq : w0 = w3 := by exact mul_right_cancel₀ ha heq
+        exact Ne.elim h03 (congrArg some h_eq)
+      field_simp[w03_neq0,denomi1_neq0]
+      ring_nf
+      exact coe_ne_coe_iff.mp h03
+      intro heq
+      field_simp at heq
+      rw[add_right_cancel_iff,mul_comm,mul_comm f.a w3] at heq
+      have h_eq : w0 = w3 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h03 (congrArg some h_eq)
+
+      -- Goal: (f(w0) - f(w1)) / (f(w0) - f(w3)) = (w0-w1) / (w0-w3)
+
+    | some w0, some w1, some w2, none =>
+      -- z3 = ∞
+      simp only [ne_eq] at h01 h02 h12
+      rw [apply_affine_inf, apply_affine_finite w0,
+          apply_affine_finite w1, apply_affine_finite w2]
+      rw [cross_ratio_none_z3_eq, cross_ratio_none_z3_eq]
+      -- Goal: (f(w0) - f(w1)) / (a/d)(w2-w1) = (w0-w1) / (w2-w1)
+      congr 1
+      field_simp
+      have w21_neq0 : w2 - w1 ≠ 0 := by exact sub_ne_zero_of_ne fun a ↦ h12 (congrArg some (id (Eq.symm a)))
+      have denomi1 : (f.a * w2 + f.b - (f.a * w1 + f.b)) ≠ 0 := by
+        intro heq
+        ring_nf at heq
+        rw[sub_eq_zero, mul_comm, mul_comm _ w1] at heq
+        have h_eq : w2 = w1 := by exact mul_right_cancel₀ ha heq
+        exact Ne.elim h12 (congrArg some (id (Eq.symm h_eq)))
+      field_simp[w21_neq0,denomi1]
+      ring_nf
+      exact coe_ne_coe_iff.mp fun a ↦ h12 (id (Eq.symm a))
+      intro heq
+      field_simp at heq
+      rw[add_right_cancel_iff,mul_comm,mul_comm f.a w1] at heq
+      have h_eq : w2 = w1 := by exact mul_right_cancel₀ ha heq
+      exact Ne.elim h12 (congrArg some (id (Eq.symm h_eq)))
+
+    -- Impossible cases: two or more ∞
+    | none, none, _, _ => exact absurd rfl h01
+    | none, _, none, _ => exact absurd rfl h02
+    | none, _, _, none => exact absurd rfl h03
+    | _, none, none, _ => exact absurd rfl h12
+    | _, none, _, none => exact absurd rfl h13
+    | _, _, none, none => exact absurd rfl h23
+
+
+  ·-- ═══════════════════════════════════════════════════════════════
+   -- CASE B: c ≠ 0 (full Möbius transformation)
+   -- f(z) = (az+b)/(cz+d), f(∞) = a/c, f(-d/c) = ∞
+   -- ═══════════════════════════════════════════════════════════════
+
+    match z0, z1, z2, z3 with
+
+    -- ─────────────────────────────────────────────────────────────
+    -- CASE B.1: All four points are finite
+    -- ─────────────────────────────────────────────────────────────
+    | some w0, some w1, some w2, some w3 =>
+      have h01 : w0 ≠ w1 := by exact_mod_cast h01
+      have h02 : w0 ≠ w2 := by exact_mod_cast h02
+      have h03 : w0 ≠ w3 := by exact_mod_cast h03
+      have h12 : w1 ≠ w2 := by exact_mod_cast h12
+      have h13 : w1 ≠ w3 := by exact_mod_cast h13
+      have h23 : w2 ≠ w3 := by exact_mod_cast h23
+
+      -- Helper lemmas for this case
+      -- Apply to finite point not at pole
+      have apply_finite : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+        intro w hw
+        push_neg at hc
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have condition1 : w ≠ -f.d / f.c := by
+          intro heq
+          field_simp at heq
+          rw[eq_neg_iff_add_eq_zero, mul_comm] at heq
+          exact Ne.elim hw heq
+        simp [condition1]
+        congr 1
+
+      -- Apply to point at pole gives ∞
+      have apply_pole : ∀ w : ℂ, f.c * w + f.d = 0 → f (some w) = none := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have : w = -f.d / f.c := by
+          field_simp
+          rw[eq_neg_iff_add_eq_zero, mul_comm]
+          exact hw
+        simp [this]
+      -- Apply to ∞ gives a/c
+      have apply_inf : f none = some (f.a / f.c) := by
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        congr 1
+
+      have apply_sub : ∀ w1 w2 : ℂ, f.c * w1 + f.d ≠ 0 → f.c * w2 + f.d ≠ 0 →
+          (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+          (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+        intro w1 w2 hw1 hw2
+        rw [div_sub_div _ _ hw1 hw2]
+        congr 1
+        ring
+
+
+      -- Sub-cases: is any point at the pole -d/c?
+      by_cases hp0 : f.c * w0 + f.d = 0
+      ·-- CASE B.1.a: w0 is at the pole, so f(w0) = ∞
+        rw [apply_pole w0 hp0]
+        -- f(w0) = ∞, so we use cross_ratio_none_z0_eq for LHS
+
+        -- w1, w2, w3 cannot be at pole (distinct from w0)
+        have hp1 : f.c * w1 + f.d ≠ 0 := by
+          intro h
+          have this1 : w1 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h01_1 (congrArg some this2))
+        have hp2 : f.c * w2 + f.d ≠ 0 := by
+          intro h
+          have this1 : w2 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h02_1 (congrArg some this2))
+        have hp3 : f.c * w3 + f.d ≠ 0 := by
+          intro h
+          have this1 : w3 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp
+            rw[eq_neg_iff_add_eq_zero, mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h03_1 (congrArg some this2))
+        rw [apply_finite w1 hp1, apply_finite w2 hp2, apply_finite w3 hp3]
+        rw [cross_ratio_none_z0_eq, cross_ratio_some_eq]
+        rw [apply_sub w2 w3 hp2 hp3, apply_sub w2 w1 hp2 hp1]
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+        have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+        have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+        have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+        have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+        have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+        field_simp [hdet, hdiff23, hdiff21, hdiff01, hdiff03, hprod23, hprod21]
+        congr 1
+        have denomi1 : ((f.c * w3 + f.d) * (w2 - w1)) ≠ 0 := by
+          apply mul_ne_zero
+          exact hp3
+          exact hdiff21
+        have denomi2 : ((w2 - w1) * (w0 - w3)) ≠ 0 := by
+          apply mul_ne_zero
+          exact hdiff21
+          exact hdiff03
+        field_simp [denomi1, denomi2]
+        have denomi3 : (w3 * f.c + f.d) ≠ 0 := by
+          rw [mul_comm]
+          exact hp3
+        field_simp [denomi3]
+        have hw0 : w0 = -f.d / f.c := by
+          field_simp
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hp0
+        rw [hw0]
+        field_simp [hc]
+        ring_nf
+        exact h03
+        exact h12.symm
+        intro heq
+        field_simp [hp2,hp1] at heq
+        rw [mul_comm] at hp2
+        field_simp [hp2] at heq
+        ring_nf at heq
+        simp only [add_left_inj] at heq
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        have heq_sub :  f.a * w2 * f.d + f.b * f.c * w1 =  f.a * w1 * f.d + w2 * f.b * f.c := by
+          apply sub_eq_zero.mp
+          calc
+            f.a * w2 * f.d + f.b * f.c * w1 - (f.a * w1 * f.d + w2 * f.b * f.c)
+                =(f.a * w2 * f.d + f.b * f.c * w1 + f.a * w2 * f.c * w1) - (f.a * w1 * f.d + w2 * f.b
+                * f.c + f.a * w2 * f.c * w1) := by ring_nf
+            _ = (f.a * w2 * f.c * w1 + f.a * w2 * f.d + f.b * f.c * w1) - (f.a * w2 * f.c * w1 + f.a
+            * w1 * f.d + w2 * f.b * f.c) := by ring_nf
+            _ = 0 := by rw [heq,sub_self]
+        have h_factor : (f.a * f.d - f.b * f.c) * (w2 - w1) = 0 := by
+          apply sub_eq_zero.mp
+          rw [sub_zero]
+          calc
+            (f.a * f.d - f.b * f.c) * (w2 - w1)
+               = (f.a * f.d) * (w2 - w1) - (f.b * f.c) * (w2 - w1) := by ring_nf
+            _ = (f.a * w2 * f.d + f.b * f.c * w1) - (f.a * w1 * f.d + w2 * f.b * f.c) := by ring_nf
+            _ = 0 := by rw[heq_sub, sub_self]
+        have hw_ne : w2 - w1 ≠ 0 := by exact sub_ne_zero_of_ne (id (Ne.symm h12))
+        apply mul_ne_zero at h_factor
+        exact h_factor
+        exact hdet
+        exact hw_ne
+
+      · by_cases hp1 : f.c * w1 + f.d = 0
+
+        ·-- CASE B.1.b: w1 is at the pole, so f(w1) = ∞
+          rw [apply_pole w1 hp1]
+          have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+          have hp2 : f.c * w2 + f.d ≠ 0 := by
+            intro h
+            have this1 : w2 = -f.d / f.c := by
+             field_simp [hc]
+             rw [eq_neg_iff_add_eq_zero, mul_comm w2 _]
+             exact h
+            have this2 : w1 = -f.d / f.c := by
+              field_simp [hc]
+              rw [eq_neg_iff_add_eq_zero, mul_comm w1 _]
+              exact hp1
+            rw [← this1] at this2
+            (expose_names; exact Ne.elim h12_1 (congrArg some this2))
+          have hp3 : f.c * w3 + f.d ≠ 0 := by
+            intro h
+            have this1 : w3 = -f.d / f.c := by
+              field_simp
+              rw[eq_neg_iff_add_eq_zero, mul_comm]
+              exact h
+            have this2 : w1 = -f.d / f.c := by
+              field_simp [hc]
+              rw [eq_neg_iff_add_eq_zero, mul_comm w1 _]
+              exact hp1
+            rw [← this1] at this2
+            (expose_names; exact Ne.elim h13_1 (congrArg some this2))
+          rw [apply_finite w0 hp0', apply_finite w2 hp2, apply_finite w3 hp3]
+          rw [cross_ratio_none_z1_eq,cross_ratio_some_eq]
+          congr 1
+          rw [apply_sub w2 w3 hp2 hp3, apply_sub w0 w3 hp0' hp3]
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+          have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+          have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+          have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+          have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+          have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0' hp3
+          have hw1 : w1 = -f.d / f.c := by
+            field_simp [hc] at hp1
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp1
+          rw [hw1]
+          field_simp [hc, hdet,hprod23,hprod03]
+          have denomi2 : (f.c * w2 - -f.d) ≠ 0 := by
+            intro heq
+            simp only [sub_neg_eq_add] at heq
+            exact Ne.elim hp2 heq
+          field_simp [denomi2]
+          ring_nf
+          (expose_names; exact coe_ne_coe_iff.mp h03_1)
+          (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+          intro heq
+          field_simp at heq
+          have denomi3 : (w0 * f.c + f.d) ≠ 0 := by
+            rw [mul_comm]
+            exact hp0'
+          field_simp at heq
+          ring_nf at heq
+          have heq' : (f.a * f.d - f.b * f.c) * (w0 - w3) = 0 := by
+            calc (f.a * f.d - f.b * f.c) * (w0 - w3)
+                = f.a * w0 * f.d + f.b * f.c * w3 - f.a * w3 * f.d - w0 * f.b * f.c := by ring
+              _ = (f.a * w0 * f.c * w3 + f.a * w0 * f.d + f.b * f.c * w3 + f.b * f.d) -
+                  (f.a * w0 * f.c * w3 + f.a * w3 * f.d + w0 * f.b * f.c + f.b * f.d) := by ring
+              _ = 0 := by rw [heq]; ring
+          rcases mul_eq_zero.mp heq' with hdet | hdiff
+          · have hdet1 : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            contradiction
+          · exact h03 (sub_eq_zero.mp hdiff)
+        · by_cases hp2 : f.c * w2 + f.d = 0
+
+          ·-- CASE B.1.c: w2 is at the pole, so f(w2) = ∞
+            rw [apply_pole w2 hp2]
+
+            have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+            have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+            have hp3 : f.c * w3 + f.d ≠ 0 := by
+              intro h
+              have this1 : w3 = -f.d / f.c  := by
+                field_simp
+                rw [eq_neg_iff_add_eq_zero,mul_comm]
+                exact h
+              have this2 : w2 = -f.d / f.c := by
+                field_simp
+                rw [eq_neg_iff_add_eq_zero,mul_comm]
+                exact hp2
+              rw [←this1] at this2
+              (expose_names; exact Ne.elim h23_1 (congrArg some this2))
+            rw [apply_finite w0 hp0', apply_finite w1 hp1', apply_finite w3 hp3]
+            rw [cross_ratio_none_z2_eq, cross_ratio_some_eq]
+            rw [apply_sub w0 w1 hp0' hp1', apply_sub w0 w3 hp0' hp3]
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+            have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+            have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+            have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+            have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0' hp1'
+            have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0' hp3
+            have hw2 : w2 = -f.d / f.c := by
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp2
+            congr 1
+            rw [hw2]
+            field_simp [hc,hdet,hprod01,hprod03]
+            have hne : -f.d - f.c * w1 ≠ 0 := by
+              intro h
+              apply hp1'
+              have : f.c * w1 + f.d = -(-f.d - f.c * w1) := by ring
+              rw [this, h, neg_zero]
+            field_simp [hne]
+            ring_nf
+            (expose_names; exact coe_ne_coe_iff.mp h03_1)
+            (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+            rw [ne_eq, ← sub_eq_zero, apply_sub w0 w3 hp0' hp3]
+            exact div_ne_zero (mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h03)) (mul_ne_zero hp0' hp3)
+
+          · by_cases hp3 : f.c * w3 + f.d = 0
+
+            ·-- CASE B.1.d: w3 is at the pole, so f(w3) = ∞
+              rw [apply_pole w3 hp3]
+              have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+              have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+              have hp2' : f.c * w2 + f.d ≠ 0 := hp2
+              rw [apply_finite w0 hp0', apply_finite w1 hp1', apply_finite w2 hp2']
+              rw [cross_ratio_none_z3_eq, cross_ratio_some_eq]
+              rw [apply_sub w0 w1 hp0' hp1', apply_sub w2 w1 hp2' hp1']
+              have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+              have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+              have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+              have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+              have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+              have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0' hp1'
+              have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2' hp1'
+              have hw3 : w3 = -f.d / f.c := by
+                field_simp
+                rw [eq_neg_iff_add_eq_zero,mul_comm]
+                exact hp3
+              congr 1
+              rw [hw3]
+              field_simp [hc, hdet, hprod01, hprod21]
+              simp only [sub_neg_eq_add]
+              field_simp [hp0']
+              (expose_names; exact coe_ne_coe_iff.mp h03_1)
+              (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+              rw [ne_eq, ← sub_eq_zero, apply_sub w2 w1 hp2' hp1']
+              exact div_ne_zero (mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h12.symm)) (mul_ne_zero hp2' hp1')
+
+
+            ·-- CASE B.1.e: No point is at the pole
+              -- All four map to finite values
+              -- This is the main computational case
+              rw [apply_finite w0 hp0, apply_finite w1 hp1,
+                  apply_finite w2 hp2, apply_finite w3 hp3]
+              rw [cross_ratio_some_eq, cross_ratio_some_eq]
+              rw [apply_sub w0 w1 hp0 hp1, apply_sub w0 w3 hp0 hp3,
+                  apply_sub w2 w3 hp2 hp3, apply_sub w2 w1 hp2 hp1]
+              have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+              have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+              have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+              have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+              have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+              have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0 hp1
+              have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0 hp3
+              have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+              have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+              field_simp [hdet, hprod01, hprod03, hprod23, hprod21]
+              (expose_names; exact coe_ne_coe_iff.mp h03_1)
+              (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+              rw [ne_eq, ← sub_eq_zero, apply_sub w0 w3 hp0 hp3]
+              exact div_ne_zero (mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h03)) (mul_ne_zero hp0 hp3)
+              rw [ne_eq, ← sub_eq_zero, apply_sub w2 w1 hp2 hp1]
+              exact div_ne_zero (mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h12.symm)) (mul_ne_zero hp2 hp1)
+    -- ─────────────────────────────────────────────────────────────
+    -- CASE B.2: z0 = ∞, others finite
+    -- ─────────────────────────────────────────────────────────────
+    | none, some w1, some w2, some w3 =>
+      have h12 : w1 ≠ w2 := by exact_mod_cast h12
+      have h13 : w1 ≠ w3 := by exact_mod_cast h13
+      have h23 : w2 ≠ w3 := by exact_mod_cast h23
+
+
+      -- f(∞) = a/c
+      have apply_inf : f none = some (f.a / f.c) := by
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        rfl
+
+      -- Apply to finite point not at pole
+      have apply_finite : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have condiction_ne : w ≠ -f.d / f.c := by
+          intro heq
+          field_simp at heq
+          rw[eq_neg_iff_add_eq_zero,mul_comm] at heq
+          contradiction
+        simp [condiction_ne]
+        congr 1
+
+      -- Apply to point at pole gives ∞
+      have apply_pole : ∀ w : ℂ, f.c * w + f.d = 0 → f (some w) = none := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have : w = -f.d / f.c := by
+          field_simp [hc] at hw
+          field_simp [hc]
+          rw[eq_neg_iff_add_eq_zero,mul_comm]
+          exact hw
+        simp [this]
+
+      -- Key: difference f(∞) - f(w) = (a/c) - f(w)
+      have apply_inf_sub : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f.a / f.c - (f.a * w + f.b) / (f.c * w + f.d) =
+          (f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+        intro w hw
+        have hc' : f.c ≠ 0 := hc
+        field_simp [hc', hw]
+        ring
+
+      -- Key: difference of two finite images
+      have apply_sub : ∀ w1 w2 : ℂ, f.c * w1 + f.d ≠ 0 → f.c * w2 + f.d ≠ 0 →
+          (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+          (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+        intro w1 w2 hw1 hw2
+        rw [div_sub_div _ _ hw1 hw2]
+        congr 1
+        ring
+
+      -- f(∞) = a/c, need to check if any wi is at the pole
+      by_cases hp1 : f.c * w1 + f.d = 0
+
+      ·-- CASE B.2.a: w1 is at the pole
+        rw [apply_inf, apply_pole w1 hp1]
+        have hp2 : f.c * w2 + f.d ≠ 0 := by
+          intro h
+          have this1 : w2 = -f.d / f.c := by
+            field_simp [hc] at h
+            field_simp
+            rw[eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w1 = -f.d / f.c := by
+            field_simp [hc] at hp1
+            field_simp
+            rw[eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp1
+          rw [← this1] at this2
+          contradiction
+        have hp3 : f.c * w3 + f.d ≠ 0 := by
+          intro h
+          have this1 : w3 = -f.d / f.c := by
+            field_simp [hc]
+            rw[eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w1 = -f.d / f.c := by
+            field_simp [hc]
+            rw[eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp1
+          rw [← this1] at this2
+          contradiction
+        rw [apply_finite w2 hp2, apply_finite w3 hp3]
+        rw [cross_ratio_none_z1_eq, cross_ratio_none_z0_eq]
+        rw [apply_sub w2 w3 hp2 hp3, apply_inf_sub w3 hp3]
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+        have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+        have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+        have hw1 : w1 = -f.d / f.c := by
+          field_simp [hc]
+          rw[eq_neg_iff_add_eq_zero,mul_comm]
+          exact hp1
+        congr 1
+        field_simp [hc, hdet, hprod23]
+        rw [hw1]
+        field_simp [hc]
+        ring_nf
+        (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+        rw [ne_eq, ← sub_eq_zero, apply_inf_sub w3 hp3]
+        exact div_ne_zero f.determinant_ne_zero (mul_ne_zero hc hp3)
+
+      · by_cases hp2 : f.c * w2 + f.d = 0
+
+        ·-- CASE B.2.b: w2 is at the pole
+          rw [apply_inf, apply_pole w2 hp2]
+          have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+          have hp3 : f.c * w3 + f.d ≠ 0 := by
+            intro h
+            have this1 : w3 = -f.d / f.c := by
+              field_simp [hc] at h
+              field_simp
+              rw[eq_neg_iff_add_eq_zero,mul_comm]
+              exact h
+            have this2 : w2 = -f.d / f.c := by
+              field_simp [hc] at hp2
+              field_simp
+              rw[eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp2
+            rw [← this1] at this2
+            contradiction
+          rw [apply_finite w1 hp1', apply_finite w3 hp3]
+          rw [cross_ratio_none_z2_eq, cross_ratio_none_z0_eq]
+          rw [apply_inf_sub w1 hp1', apply_inf_sub w3 hp3]
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+          have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+          have hw2 : w2 = -f.d / f.c := by
+            field_simp [hc] at hp2
+            field_simp
+            rw[eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp2
+          field_simp [hc, hdet]
+          rw [hw2]
+          congr 1
+          field_simp
+          have h_denom_ne_zero : -f.d - f.c * w1 ≠ 0 := by
+            intro hzero
+            apply hp1
+            calc
+              f.c * w1 + f.d = -(-f.d - f.c * w1) := by ring
+              _ = -0 := by rw [hzero]
+              _ = 0 := by ring_nf
+          field_simp [h_denom_ne_zero]
+          ring_nf
+          (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+          have h_det_ne_zero : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have h_diff_ne_zero : f.a / f.c - (f.a * w3 + f.b) / (f.c * w3 + f.d) ≠ 0 := by
+            rw [apply_inf_sub w3 hp3]
+            refine div_ne_zero h_det_ne_zero ?_
+            exact mul_ne_zero (by exact hc) hp3
+          intro heq
+          apply h_diff_ne_zero
+          rw [heq, sub_self]
+
+        · by_cases hp3 : f.c * w3 + f.d = 0
+
+          ·-- CASE B.2.c: w3 is at the pole
+            rw [apply_inf, apply_pole w3 hp3]
+            have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+            have hp2' : f.c * w2 + f.d ≠ 0 := hp2
+            rw [apply_finite w1 hp1', apply_finite w2 hp2']
+            rw [cross_ratio_none_z3_eq, cross_ratio_none_z0_eq]
+            rw [apply_inf_sub w1 hp1', apply_sub w2 w1 hp2' hp1']
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+            have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+            have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2' hp1'
+            have hw3 : w3 = -f.d / f.c := by
+              field_simp [hc] at hp3
+              field_simp
+              rw[eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp3
+            field_simp [hc, hdet, hprod21]
+            rw [hw3]
+            congr 1
+            field_simp
+            ring_nf
+            (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff_ne_zero : ((f.a * w2 + f.b) / (f.c * w2 + f.d)) - ((f.a * w1 + f.b) / (f.c * w1 + f.d)) ≠ 0 := by
+              rw [apply_sub w2 w1 hp2' hp1']
+              refine div_ne_zero ?_ (mul_ne_zero hp2' hp1')
+              exact mul_ne_zero hdet (sub_ne_zero.mpr h12.symm)
+            intro heq
+            apply hdiff_ne_zero
+            rw [heq, sub_self]
+
+          ·-- CASE B.2.d: No pole among w1, w2, w3
+            rw [apply_inf, apply_finite w1 hp1, apply_finite w2 hp2, apply_finite w3 hp3]
+            rw [cross_ratio_some_eq, cross_ratio_none_z0_eq]
+            rw [apply_inf_sub w1 hp1, apply_inf_sub w3 hp3,
+                apply_sub w2 w3 hp2 hp3, apply_sub w2 w1 hp2 hp1]
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+            have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+            have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+            have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+            field_simp [hc, hdet, hprod23, hprod21]
+            (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff_ne_zero : f.a / f.c - (f.a * w3 + f.b) / (f.c * w3 + f.d) ≠ 0 := by
+              rw [apply_inf_sub w3 hp3]
+              refine div_ne_zero hdet ?_
+              refine mul_ne_zero ?_ hp3
+              exact hc
+            intro heq
+            apply hdiff_ne_zero
+            rw [heq, sub_self]
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff_ne_zero : ((f.a * w2 + f.b) / (f.c * w2 + f.d)) - ((f.a * w1 + f.b) / (f.c * w1 + f.d)) ≠ 0 := by
+              rw [apply_sub w2 w1 hp2 hp1]
+              refine div_ne_zero ?_ (mul_ne_zero hp2 hp1)
+              refine mul_ne_zero hdet (sub_ne_zero.mpr ?_)
+              exact h12.symm
+            intro heq
+            apply hdiff_ne_zero
+            rw [heq, sub_self]
+
+    -- ─────────────────────────────────────────────────────────────
+    -- CASE B.3: z1 = ∞, others finite
+    -- ─────────────────────────────────────────────────────────────
+    | some w0, none, some w2, some w3 =>
+      have h02 : w0 ≠ w2 := by exact_mod_cast h02
+      have h03 : w0 ≠ w3 := by exact_mod_cast h03
+      have h23 : w2 ≠ w3 := by exact_mod_cast h23
+      have apply_inf : f none = some (f.a / f.c) := by
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        congr 1
+
+      have apply_finite : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have condiction_ne : w ≠ -f.d / f.c := by
+          intro heq
+          field_simp at heq
+          rw[eq_neg_iff_add_eq_zero,mul_comm] at heq
+          contradiction
+        simp [condiction_ne]
+        congr 1
+
+      have apply_pole : ∀ w : ℂ, f.c * w + f.d = 0 → f (some w) = none := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have : w = -f.d / f.c := by
+          field_simp [hc] at hw
+          field_simp [hc]
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hw
+        simp [this]
+
+      have apply_inf_sub : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f.a / f.c - (f.a * w + f.b) / (f.c * w + f.d) =
+          (f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+        intro w hw
+        field_simp [hc, hw]
+        ring_nf
+
+      have apply_sub : ∀ w1 w2 : ℂ, f.c * w1 + f.d ≠ 0 → f.c * w2 + f.d ≠ 0 →
+          (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+          (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+        intro w1 w2 hw1 hw2
+        rw [div_sub_div _ _ hw1 hw2]
+        congr 1
+        ring_nf
+
+
+      by_cases hp0 : f.c * w0 + f.d = 0
+
+      ·-- CASE B.3.a: w0 is at the pole
+        have hp2 := f.ne_pole_of_ne_of_pole hc w0 w2 h02 hp0
+        have hp3 := f.ne_pole_of_ne_of_pole hc w0 w3 h03 hp0
+        have h_right : cross_ratio (↑w0 : ℂ∞) none (↑w2) (↑w3) = cross_ratio (Option.some  w0) none (Option.some  w2) (Option.some  w3) := by
+          rfl
+        have h_left : cross_ratio (f.apply ↑w0) (f.apply none) (f.apply ↑w2) (f.apply ↑w3) =
+          cross_ratio (f.apply (Option.some w0)) (f.apply none) (f.apply (Option.some w2)) (f.apply (Option.some w3)) := by
+          rfl
+        rw [h_left]
+        rw [f.apply_some_of_pole hc w0 hp0, f.apply_none hc,
+            f.apply_some_of_ne_pole hc w2 hp2, f.apply_some_of_ne_pole hc w3 hp3]
+        have h1_left : cross_ratio none (Option.some (f.a / f.c)) (Option.some ((f.a * w2 + f.b) / (f.c * w2 + f.d)))
+                       (Option.some ((f.a * w3 + f.b) / (f.c * w3 + f.d))) =
+                       cross_ratio none (↑(f.a / f.c)) (↑((f.a * w2 + f.b) / (f.c * w2 + f.d))) (↑((f.a * w3 + f.b) / (f.c * w3 + f.d))) := by
+          rfl
+        rw[h1_left]
+        rw [cross_ratio_none_z1_eq, cross_ratio_none_z0_eq]
+        rw [f.apply_sub_apply w2 w3 hp2 hp3, f.apply_sub_apply_none hc w2 hp2]
+        have hw0 := (f.pole_iff hc w0).mp hp0
+        rw [hw0]
+        have hdet := f.determinant_ne_zero
+        have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+        field_simp [hc, hdet, hprod23]
+        congr 1
+        have h_denom : -f.d - f.c * w3 ≠ 0 := by
+          intro hzero
+          apply hp3
+          calc
+            f.c * w3 + f.d = -(-f.d - f.c * w3) := by ring
+            _ = -0 := by rw [hzero]
+            _ = 0 := neg_zero
+        field_simp [hp3, h_denom, hc]
+        ring_nf
+        intro heq
+        field_simp at heq
+        rw [mul_comm] at hp2
+        field_simp at heq
+        ring_nf at heq
+        have h_eq : f.b * f.c = f.a * f.d := by
+          calc
+            f.b * f.c = (f.a * w2 * f.c + f.b * f.c) - f.a * w2 * f.c := by ring_nf
+            _ = (f.a * w2 * f.c + f.a * f.d) - f.a * w2 * f.c := by rw [heq]
+            _ = f.a * f.d := by ring_nf
+        apply f.determinant_ne_zero
+        rw [h_eq]
+        ring_nf
+        (expose_names; exact coe_ne_coe_iff.mp h03_1)
+
+      · by_cases hp2 : f.c * w2 + f.d = 0
+
+        ·-- CASE B.3.b: w2 is at the pole
+          rw [apply_inf, apply_pole w2 hp2]
+          have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+          have hp3 : f.c * w3 + f.d ≠ 0 := by
+            intro h
+            have this1 : w3 = -f.d / f.c := by
+              field_simp [hc] at h
+              field_simp [hc]
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact h
+            have this2 : w2 = -f.d / f.c := by
+              field_simp [hc] at hp2
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp2
+            rw [← this1] at this2
+            contradiction
+          rw [apply_finite w0 hp0', apply_finite w3 hp3]
+          rw [cross_ratio_none_z2_eq, cross_ratio_none_z1_eq]
+          have apply_sub_inf : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+              (f.a * w + f.b) / (f.c * w + f.d) - f.a / f.c =
+              -(f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+            intro w hw
+            field_simp [hc, hw]
+            rw [mul_comm] at hw
+            field_simp [hw]
+            ring_nf
+          rw [apply_sub_inf w0 hp0', apply_sub w0 w3 hp0' hp3]
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+          have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+          have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0' hp3
+
+          have hw2 : w2 = -f.d / f.c := by
+            field_simp [hc] at hp2
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp2
+
+          field_simp [hc, hdet, hprod03]
+          rw [hw2]
+          congr 1
+          have h_denom1 : f.c * (w0 - w3) ≠ 0 := mul_ne_zero hc hdiff03
+          field_simp [h_denom1, hdiff03]
+          ring_nf
+          (expose_names; exact coe_ne_coe_iff.mp h03_1)
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have h_diff_ne_zero : ((f.a * w0 + f.b) / (f.c * w0 + f.d)) - ((f.a * w3 + f.b) / (f.c * w3 + f.d)) ≠ 0 := by
+            rw [apply_sub w0 w3 hp0' hp3]
+            refine div_ne_zero (mul_ne_zero hdet (sub_ne_zero.mpr h03)) (mul_ne_zero hp0' hp3)
+          intro heq
+          apply h_diff_ne_zero
+          rw [heq, sub_self]
+
+        · by_cases hp3 : f.c * w3 + f.d = 0
+
+          ·-- CASE B.3.c: w3 is at the pole
+            rw [apply_inf, apply_pole w3 hp3]
+            have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+            have hp2' : f.c * w2 + f.d ≠ 0 := hp2
+
+            rw [apply_finite w0 hp0', apply_finite w2 hp2']
+            rw [cross_ratio_none_z3_eq, cross_ratio_none_z1_eq]
+
+            have apply_sub_inf : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+                (f.a * w + f.b) / (f.c * w + f.d) - f.a / f.c =
+                -(f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+              intro w hw
+              field_simp [hc, hw]
+              rw[mul_comm] at hw
+              field_simp [hw]
+              ring_nf
+
+            rw [apply_sub_inf w0 hp0', apply_sub_inf w2 hp2']
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+            have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+
+            have hw3 : w3 = -f.d / f.c := by
+              field_simp [hc] at hp3
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp3
+
+            field_simp [hc, hdet]
+            rw [hw3]
+            congr 1
+            have h_denom_right : w0 - (-f.d / f.c) ≠ 0 := by
+              intro h
+              apply hp0'
+              calc
+                f.c * w0 + f.d = f.c * (w0 - (-f.d / f.c)) := by {
+                  field_simp [hc]
+                  ring_nf
+                }
+                _ = f.c * 0 := by rw [h]
+                _ = 0 := mul_zero _
+            field_simp [hp0', h_denom_right, hc]
+            ring_nf
+            (expose_names; exact coe_ne_coe_iff.mp h03_1)
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have h_diff_ne_zero : f.a / f.c - (f.a * w2 + f.b) / (f.c * w2 + f.d) ≠ 0 := by
+              rw [apply_inf_sub w2 hp2']
+              refine div_ne_zero hdet (mul_ne_zero hc hp2')
+            by_contra heq
+            apply h_diff_ne_zero
+            rw [heq, sub_self]
+
+          ·-- CASE B.3.d: No pole among w0, w2, w3
+            rw [apply_inf, apply_finite w0 hp0, apply_finite w2 hp2, apply_finite w3 hp3]
+            rw [cross_ratio_some_eq, cross_ratio_none_z1_eq]
+
+            have apply_sub_inf : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+                (f.a * w + f.b) / (f.c * w + f.d) - f.a / f.c =
+                -(f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+              intro w hw
+              field_simp [hc, hw]
+              rw[mul_comm] at hw
+              field_simp [hw]
+              ring_nf
+
+            rw [apply_sub_inf w0 hp0, apply_sub w0 w3 hp0 hp3,
+                apply_sub w2 w3 hp2 hp3, apply_sub_inf w2 hp2]
+
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff23 : w2 - w3 ≠ 0 := sub_ne_zero.mpr h23
+            have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+            have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0 hp3
+            have hprod23 : (f.c * w2 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp2 hp3
+
+            field_simp [hc, hdet, hprod03, hprod23]
+            (expose_names; exact coe_ne_coe_iff.mp h03_1)
+            intro heq
+            have hsub := apply_sub w0 w3 hp0 hp3
+            rw [heq, sub_self] at hsub
+            have hw : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+            have hdenom : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0 hp3
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hnum : (f.a * f.d - f.b * f.c) * (w0 - w3) ≠ 0 := mul_ne_zero hdet hw
+            exact hnum (div_eq_zero_iff.mp hsub.symm |>.resolve_right hdenom)
+            intro heq
+            have hsub := apply_inf_sub w2 hp2
+            rw [heq, sub_self] at hsub
+            have hdenom : f.c * (f.c * w2 + f.d) ≠ 0 := mul_ne_zero hc hp2
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            exact hdet (div_eq_zero_iff.mp hsub.symm |>.resolve_right hdenom)
+
+
+    -- ─────────────────────────────────────────────────────────────
+    -- CASE B.4: z2 = ∞, others finite
+    -- ─────────────────────────────────────────────────────────────
+    | some w0, some w1, none, some w3 =>
+
+      have h01 : w0 ≠ w1 := by exact_mod_cast h01
+      have h03 : w0 ≠ w3 := by exact_mod_cast h03
+      have h13 : w1 ≠ w3 := by exact_mod_cast h13
+
+      have apply_inf : f none = some (f.a / f.c) := by
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        congr 1
+
+      have apply_finite : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have condiction_ne : w ≠ -f.d / f.c := by
+          intro heq
+          field_simp at heq
+          rw[eq_neg_iff_add_eq_zero,mul_comm] at heq
+          contradiction
+        simp [condiction_ne]
+        congr 1
+
+      have apply_pole : ∀ w : ℂ, f.c * w + f.d = 0 → f (some w) = none := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have : w = -f.d / f.c := by
+          field_simp [hc] at hw
+          field_simp [hc]
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hw
+        simp [this]
+
+      have apply_inf_sub : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f.a / f.c - (f.a * w + f.b) / (f.c * w + f.d) =
+          (f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+        intro w hw
+        field_simp [hc, hw]
+        ring_nf
+
+      have apply_sub : ∀ w1 w2 : ℂ, f.c * w1 + f.d ≠ 0 → f.c * w2 + f.d ≠ 0 →
+          (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+          (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+        intro w1 w2 hw1 hw2
+        rw [div_sub_div _ _ hw1 hw2]
+        congr 1
+        ring_nf
+
+      by_cases hp0 : f.c * w0 + f.d = 0
+
+      ·-- CASE B.4.a: w0 is at the pole
+        rw [apply_pole w0 hp0, apply_inf]
+        have hp1 : f.c * w1 + f.d ≠ 0 := by
+          intro h
+          have this1 : w1 = -f.d / f.c := by
+            field_simp [hc] at h
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp [hc] at hp0
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h01_1 (congrArg some this2))
+        have hp3 : f.c * w3 + f.d ≠ 0 := by
+          intro h
+          have this1 : w3 = -f.d / f.c := by
+            field_simp [hc] at h
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp [hc] at hp0
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h03_1 (congrArg some this2))
+
+
+        rw [apply_finite w1 hp1, apply_finite w3 hp3]
+        rw [cross_ratio_none_z0_eq, cross_ratio_none_z2_eq]
+        rw [apply_inf_sub w3 hp3, apply_inf_sub w1 hp1]
+
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+        have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+
+        have hw0 : w0 = -f.d / f.c := by
+          field_simp [hc] at hp0
+          field_simp
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hp0
+
+        congr 1
+        rw [hw0]
+        field_simp [hc, hp1, hp3, hdet]
+        have h : -f.d - f.c * w3 ≠ 0 := by
+          have : -f.d - f.c * w3 = -(f.c * w3 + f.d) := by ring
+          rw [this]
+          exact neg_ne_zero.mpr hp3
+        field_simp [h]
+        ring_nf
+        (expose_names; exact coe_ne_coe_iff.mp h03_1)
+        have := apply_inf_sub w1 hp1
+        have hdenom : f.c * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hc hp1
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        exact sub_ne_zero.mp (by rw [this]; exact div_ne_zero hdet hdenom)
+
+
+      · by_cases hp1 : f.c * w1 + f.d = 0
+
+        ·-- CASE B.4.b: w1 is at the pole
+          rw [apply_inf, apply_pole w1 hp1]
+          have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+          have hp3 : f.c * w3 + f.d ≠ 0 := by
+            intro h
+            have this1 : w3 = -f.d / f.c := by
+              field_simp [hc] at h
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact h
+            have this2 : w1 = -f.d / f.c := by
+              field_simp [hc] at hp1
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp1
+            rw [← this1] at this2
+            (expose_names; exact Ne.elim h13_1 (congrArg some this2))
+          rw [apply_finite w0 hp0', apply_finite w3 hp3]
+          rw [cross_ratio_none_z1_eq, cross_ratio_none_z2_eq]
+          rw [apply_inf_sub w3 hp3, apply_sub w0 w3 hp0' hp3]
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+          have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+          have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0' hp3
+
+          have hw1 : w1 = -f.d / f.c := by
+            field_simp [hc] at hp1
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp1
+          congr 1
+          rw [hw1]
+          field_simp [hc, hdet, hprod03]
+          ring_nf
+          (expose_names; exact coe_ne_coe_iff.mp h03_1)
+          have hsub := apply_sub w0 w3 hp0' hp3
+          have hdenom : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0' hp3
+          have hnum : (f.a * f.d - f.b * f.c) * (w0 - w3) ≠ 0 :=
+            mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h03)
+          exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero hnum hdenom)
+
+        · by_cases hp3 : f.c * w3 + f.d = 0
+
+          ·-- CASE B.4.c: w3 is at the pole
+            rw [apply_inf, apply_pole w3 hp3]
+            have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+            have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+            rw [apply_finite w0 hp0', apply_finite w1 hp1']
+            rw [cross_ratio_none_z3_eq, cross_ratio_none_z2_eq]
+            rw [apply_sub w0 w1 hp0' hp1', apply_inf_sub w1 hp1']
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+            have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+            have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0' hp1'
+            have hw3 : w3 = -f.d / f.c := by
+              field_simp [hc] at hp3
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp3
+            congr 1
+            rw [hw3]
+            field_simp [hc, hdet, hprod01,hp0]
+            ring_nf
+            (expose_names; exact coe_ne_coe_iff.mp h03_1)
+            have hsub := apply_inf_sub w1 hp1'
+            have hdenom : f.c * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hc hp1'
+            exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero f.determinant_ne_zero hdenom)
+
+          ·-- CASE B.4.d: No pole among w0, w1, w3
+            rw [apply_inf, apply_finite w0 hp0, apply_finite w1 hp1, apply_finite w3 hp3]
+            rw [cross_ratio_some_eq, cross_ratio_none_z2_eq]
+            rw [apply_sub w0 w1 hp0 hp1, apply_sub w0 w3 hp0 hp3,
+                apply_inf_sub w3 hp3, apply_inf_sub w1 hp1]
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+            have hdiff03 : w0 - w3 ≠ 0 := sub_ne_zero.mpr h03
+            have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0 hp1
+            have hprod03 : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0 hp3
+            field_simp [hc, hdet, hprod01, hprod03]
+            (expose_names; exact coe_ne_coe_iff.mp h03_1)
+            have hsub := apply_sub w0 w3 hp0 hp3
+            have hdenom : (f.c * w0 + f.d) * (f.c * w3 + f.d) ≠ 0 := mul_ne_zero hp0 hp3
+            have hnum : (f.a * f.d - f.b * f.c) * (w0 - w3) ≠ 0 :=
+              mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h03)
+            exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero hnum hdenom)
+            have hsub := apply_inf_sub w1 hp1
+            have hdenom : f.c * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hc hp1
+            exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero f.determinant_ne_zero hdenom)
+
+    -- ─────────────────────────────────────────────────────────────
+    -- CASE B.5: z3 = ∞, others finite
+    -- ─────────────────────────────────────────────────────────────
+    | some w0, some w1, some w2, none =>
+      have h01 : w0 ≠ w1 := by exact_mod_cast h01
+      have h02 : w0 ≠ w2 := by exact_mod_cast h02
+      have h12 : w1 ≠ w2 := by exact_mod_cast h12
+
+      have apply_inf : f none = some (f.a / f.c) := by
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        congr 1
+
+      have apply_finite : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f (some w) = some ((f.a * w + f.b) / (f.c * w + f.d)) := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have condiction_ne : w ≠ -f.d / f.c := by
+          intro heq
+          field_simp at heq
+          rw[eq_neg_iff_add_eq_zero,mul_comm] at heq
+          contradiction
+        simp [condiction_ne]
+        congr 1
+
+      have apply_pole : ∀ w : ℂ, f.c * w + f.d = 0 → f (some w) = none := by
+        intro w hw
+        simp only [LinearFracTrans.apply, hc, ↓reduceIte]
+        have : w = -f.d / f.c := by
+          field_simp [hc] at hw
+          field_simp [hc]
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hw
+        simp [this]
+
+      have apply_inf_sub : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+          f.a / f.c - (f.a * w + f.b) / (f.c * w + f.d) =
+          (f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+        intro w hw
+        field_simp [hc, hw]
+        ring_nf
+
+      have apply_sub : ∀ w1 w2 : ℂ, f.c * w1 + f.d ≠ 0 → f.c * w2 + f.d ≠ 0 →
+          (f.a * w1 + f.b) / (f.c * w1 + f.d) - (f.a * w2 + f.b) / (f.c * w2 + f.d) =
+          (f.a * f.d - f.b * f.c) * (w1 - w2) / ((f.c * w1 + f.d) * (f.c * w2 + f.d)) := by
+        intro w1 w2 hw1 hw2
+        rw [div_sub_div _ _ hw1 hw2]
+        congr 1
+        ring_nf
+
+      have apply_sub_inf : ∀ w : ℂ, f.c * w + f.d ≠ 0 →
+            (f.a * w + f.b) / (f.c * w + f.d) - f.a / f.c =
+            -(f.a * f.d - f.b * f.c) / (f.c * (f.c * w + f.d)) := by
+          intro w hw
+          field_simp [hc, hw]
+          rw [mul_comm]
+          field_simp [hw]
+          ring_nf
+
+
+      by_cases hp0 : f.c * w0 + f.d = 0
+
+      ·-- CASE B.5.a: w0 is at the pole
+        rw [apply_pole w0 hp0, apply_inf]
+        have hp1 : f.c * w1 + f.d ≠ 0 := by
+          intro h
+          have this1 : w1 = -f.d / f.c := by
+            field_simp [hc] at h
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp [hc] at hp0
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h01_1 (congrArg some this2))
+        have hp2 : f.c * w2 + f.d ≠ 0 := by
+          intro h
+          have this1 : w2 = -f.d / f.c := by
+            field_simp [hc] at h
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact h
+          have this2 : w0 = -f.d / f.c := by
+            field_simp [hc] at hp0
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp0
+          rw [← this1] at this2
+          (expose_names; exact Ne.elim h02_1 (congrArg some this2))
+        rw [apply_finite w1 hp1, apply_finite w2 hp2]
+        rw [cross_ratio_none_z0_eq, cross_ratio_none_z3_eq]
+        rw [apply_sub_inf w2 hp2, apply_sub w2 w1 hp2 hp1]
+        have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+        have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+        have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+        have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+        have hw0 : w0 = -f.d / f.c := by
+          field_simp [hc] at hp0
+          field_simp
+          rw [eq_neg_iff_add_eq_zero,mul_comm]
+          exact hp0
+        field_simp [hc, hdet, hprod21]
+        congr 1
+        rw [hw0]
+        field_simp [hc, hdiff21]
+        ring_nf
+        (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+        have hsub := apply_sub w2 w1 hp2 hp1
+        have hdenom : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+        have hnum : (f.a * f.d - f.b * f.c) * (w2 - w1) ≠ 0 :=
+          mul_ne_zero f.determinant_ne_zero (sub_ne_zero.mpr h12.symm)
+        exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero hnum hdenom)
+
+
+      · by_cases hp1 : f.c * w1 + f.d = 0
+
+        ·-- CASE B.5.b: w1 is at the pole
+          rw [apply_inf, apply_pole w1 hp1]
+          have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+          have hp2 : f.c * w2 + f.d ≠ 0 := by
+            intro h
+            have this1 : w2 = -f.d / f.c := by
+              field_simp [hc] at h
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact h
+            have this2 : w1 = -f.d / f.c := by
+              field_simp [hc] at hp1
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp1
+            rw [← this1] at this2
+            (expose_names; exact Ne.elim h12_1 (congrArg some this2))
+          rw [apply_finite w0 hp0', apply_finite w2 hp2]
+          rw [cross_ratio_none_z1_eq, cross_ratio_none_z3_eq]
+          rw [apply_sub_inf w2 hp2, apply_sub_inf w0 hp0']
+          have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+          have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+          have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+          have hw1 : w1 = -f.d / f.c := by
+            field_simp [hc] at hp1
+            field_simp
+            rw [eq_neg_iff_add_eq_zero,mul_comm]
+            exact hp1
+          field_simp [hc, hdet]
+          congr 1
+          field_simp[h12.symm,hp2]
+          rw [hw1]
+          field_simp [hc]
+          ring_nf
+          (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+          have hsub := apply_sub_inf w0 hp0'
+          have hnum : -(f.a * f.d - f.b * f.c) ≠ 0 := neg_ne_zero.mpr f.determinant_ne_zero
+          have hdenom : f.c * (f.c * w0 + f.d) ≠ 0 := mul_ne_zero hc hp0'
+          exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero hnum hdenom)
+
+
+        · by_cases hp2 : f.c * w2 + f.d = 0
+
+          ·-- CASE B.5.c: w2 is at the pole
+            rw [apply_inf, apply_pole w2 hp2]
+            have hp0' : f.c * w0 + f.d ≠ 0 := hp0
+            have hp1' : f.c * w1 + f.d ≠ 0 := hp1
+            rw [apply_finite w0 hp0', apply_finite w1 hp1']
+            rw [cross_ratio_none_z2_eq, cross_ratio_none_z3_eq]
+            rw [apply_sub w0 w1 hp0' hp1', apply_sub_inf w0 hp0']
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+            have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+            have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0' hp1'
+            have hw2 : w2 = -f.d / f.c := by
+              field_simp [hc] at hp2
+              field_simp
+              rw [eq_neg_iff_add_eq_zero,mul_comm]
+              exact hp2
+            congr 1
+            field_simp [hc, hdet, hprod01]
+            rw [hw2]
+            field_simp [hc]
+            ring_nf
+            (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+            have hsub := apply_sub_inf w0 hp0'
+            have hnum : -(f.a * f.d - f.b * f.c) ≠ 0 := neg_ne_zero.mpr f.determinant_ne_zero
+            have hdenom : f.c * (f.c * w0 + f.d) ≠ 0 := mul_ne_zero hc hp0'
+            exact sub_ne_zero.mp (by rw [hsub]; exact div_ne_zero hnum hdenom)
+
+          ·-- CASE B.5.d: No pole among w0, w1, w2
+            rw [apply_inf, apply_finite w0 hp0, apply_finite w1 hp1, apply_finite w2 hp2]
+            rw [cross_ratio_some_eq, cross_ratio_none_z3_eq]
+            rw [apply_sub w0 w1 hp0 hp1, apply_sub_inf w0 hp0,
+                apply_sub_inf w2 hp2, apply_sub w2 w1 hp2 hp1]
+            have hdet : f.a * f.d - f.b * f.c ≠ 0 := f.determinant_ne_zero
+            have hdiff01 : w0 - w1 ≠ 0 := sub_ne_zero.mpr h01
+            have hdiff21 : w2 - w1 ≠ 0 := sub_ne_zero.mpr (ne_comm.mpr h12)
+            have hprod01 : (f.c * w0 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp0 hp1
+            have hprod21 : (f.c * w2 + f.d) * (f.c * w1 + f.d) ≠ 0 := mul_ne_zero hp2 hp1
+            congr 1
+            field_simp [hc, hdet, hprod01, hprod21]
+            (expose_names; exact coe_ne_coe_iff.mp (id (Ne.symm h12_1)))
+            rw [ne_eq, ← sub_eq_zero, apply_sub_inf w0 hp0]
+            apply div_ne_zero
+            · exact neg_ne_zero.mpr f.determinant_ne_zero
+            · exact mul_ne_zero hc hp0
+            rw [ne_eq, ← sub_eq_zero, apply_sub w2 w1 hp2 hp1]
+            apply div_ne_zero
+            · apply mul_ne_zero
+              · exact f.determinant_ne_zero
+              · exact sub_ne_zero.mpr h12.symm
+            · exact mul_ne_zero hp2 hp1
+
+    -- ─────────────────────────────────────────────────────────────
+    -- IMPOSSIBLE CASES: Two or more points are ∞
+    -- These contradict distinctness
+    -- ─────────────────────────────────────────────────────────────
+    | none, none, _, _ => exact absurd rfl h01
+    | none, _, none, _ => exact absurd rfl h02
+    | none, _, _, none => exact absurd rfl h03
+    | _, none, none, _ => exact absurd rfl h12
+    | _, none, _, none => exact absurd rfl h13
+    | _, _, none, none => exact absurd rfl h23
+
+
+#check LinearFracTrans.apply_sub_apply
+
+
+
+
+
+
+
+
+
+
+end CrossRatio
 
 end EComplex
 
 
-end cross_ratio
 
-end  -- noncomputable section
+
+  -- noncomputable section
