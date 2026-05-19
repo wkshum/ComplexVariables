@@ -160,7 +160,7 @@ theorem toComplex_eq_zero_iff (x : EComplex)
   · unfold toComplex
     rcases x with ⟨z⟩ | _
     · simp
-    · simp ; intro h ; exact congrArg Option.some h
+    · simp only [reduceCtorEq, false_or] ; intro h ; exact congrArg Option.some h
   · intro h
     rcases h with h1 | h2
     · rw [h1] ; rfl
@@ -462,6 +462,110 @@ lemma mul_some (a b : ℂ) :
     some a * some b = some (a * b) := by
   exact coe_mul_some a b
 
+-- Negation cancellation for division
+lemma neg_div_neg (a b : ℂ) (hb : b ≠ 0) :
+    some (-a) / some (-b) = some a / some b := by
+  rw [div_some (-a) (-b) (neg_ne_zero.mpr hb)]
+  rw [div_some a b hb]
+  congr 1
+  field_simp
+
+
+-- Difference antisymmetry
+lemma sub_antisymm (a b : ℂ) :
+    some a - some b = -(some b - some a) := by
+  rw [sub_some a b, sub_some b a]
+  congr 1
+  ring
+
+-- Negation of some
+lemma neg_some (a : ℂ) :
+    -(some a : EComplex) = some (-a) := by
+      exact Eq.symm (coe_neg a)
+
+-- Division reciprocal: 1 / (a / b) = b / a
+lemma one_div_div (a b : ℂ) (ha : a ≠ 0) (hb : b ≠ 0) :
+    (1 : EComplex) / (some a / some b) = some b / some a := by
+  rw [div_some a b hb, div_some b a ha]
+  rw [coe_div,coe_div]
+  change EComplex.div ↑1 (some a / some b) = EComplex.div (some b)  (some a)
+  unfold EComplex.div
+  change 1 * (EComplex.div (some a)  (some b)).inv = some b * (some a).inv
+  unfold EComplex.div
+  unfold EComplex.inv
+  simp only [hb,ha,↓reduceIte]
+  rw [← EComplex_multiplication,← EComplex_multiplication,← EComplex_multiplication]
+  unfold EComplex.mul
+  simp only [mul_eq_zero, inv_eq_zero, mul_inv_rev, inv_inv,ha,hb]
+  simp only [or_self, ↓reduceIte, one_mul]
+  exact ha
+  exact hb
+
+-- Multiplication commutativity
+lemma mul_comm_ecomplex (x y : EComplex) :
+    x * y = y * x := by
+  change EComplex.mul x y = EComplex.mul y x
+  unfold EComplex.mul
+  cases x <;> cases y <;> simp [mul_comm]
+
+
+-- Product of fractions
+lemma div_mul_div (a b c d : ℂ) (hb : b ≠ 0) (hd : d ≠ 0) :
+    (some a / some b) * (some c / some d) = some (a * c) / some (b * d) := by
+  rw [div_some a b hb, div_some c d hd]
+  rw [mul_some (a / b) (c / d)]
+  rw [div_some (a * c) (b * d) (mul_ne_zero hb hd)]
+  congr 1
+  field_simp
+
+
+-- Division by itself equals one
+lemma div_self_some (a : ℂ) (ha : a ≠ 0) :
+    some a / some a = (1 : EComplex) := by
+  rw [div_some a a ha]
+  congr 1
+  field_simp
+
+  -- Multiplication by reciprocal
+lemma mul_div_self (a b : ℂ) (hb : b ≠ 0) :
+    (some b) * (some a / some b) = some a := by
+  rw [div_some a b hb, mul_some b (a / b)]
+  congr 1
+  field_simp
+
+-- Useful identity: (a/b) * (c/a) = c/b when a ≠ 0
+lemma div_mul_div_cancel (a b c : ℂ) (ha : a ≠ 0) (hb : b ≠ 0) :
+    (some a / some b) * (some c / some a) = some c / some b := by
+    rw [div_some,div_some,div_some,← coe_mul]
+    congr 1
+    field_simp
+    exact hb
+    exact ha
+    exact hb
+
+
+-- 1 minus a fraction
+lemma one_sub_div (x y : ℂ) (hy : y ≠ 0) :
+    (1 : EComplex) - some x / some y = some (y - x) / some y := by
+  rw [div_some x y hy, div_some (y - x) y hy]
+  rw [← EComplex_subtraction]
+  unfold EComplex.sub
+  rw [← EComplex_addition]
+  unfold EComplex.add
+  have hprod : (↑(-1 : ℂ) : EComplex) * (↑(x / y) : EComplex) = some ((-1) * (x / y)) := rfl
+  have h1 : (1 : EComplex) = some (1 : ℂ) := rfl
+  rw [h1, hprod]
+  simp only [neg_mul, one_mul, coe_eq_coe_iff]
+  field_simp
+  ring
+
+
+lemma one_sub_mul_div_div (a b c d : ℂ) (hb : b ≠ 0) (hd : d ≠ 0) :
+    (1 : EComplex) - (some a / some b) * (some c / some d) =
+    some (b * d - a * c) / some (b * d) := by
+  rw [div_mul_div a b c d hb hd]
+  rw [one_sub_div (a * c) (b * d) (mul_ne_zero hb hd)]
+
 
 #check (some 3) / (some 5)
 end EComplex
@@ -510,6 +614,8 @@ def apply (f : LinearFracTrans) (z : EComplex) : EComplex :=
           else some ((f.a * z + f.b) / (f.c * z + f.d))
         | ∞ => some (f.a / f.c)
 
+/-- The pole of an LFT with c ≠ 0 is -d/c -/
+def pole (f : LinearFracTrans) (hc : f.c ≠ 0) : ℂ := -f.d / f.c
 
 -- testing the apply function
 def f_test : LinearFracTrans :=
@@ -2186,6 +2292,36 @@ lemma lft_mul_left_inv (f : LinearFracTrans)
       apply div_self
       exact f.determinant_ne_zero
 
+lemma lft_mul_right_inv (f : LinearFracTrans)
+   : comp f (inv f)= id := by
+  unfold inv
+  ext
+  · unfold comp
+    simp
+    calc
+    _ = (f.d * f.a + (-f.b) * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
+  · unfold comp
+    simp
+    calc
+      _ = (f.d * f.b -f.d * f.b) / (f.a * f.d - f.b * f.c) := by ring
+      _ = 0 := by ring
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.c -f.a * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 0 := by ring
+  · unfold comp
+    simp
+    calc
+    _ = (f.a * f.d  -f.b * f.c) / (f.a * f.d - f.b * f.c) := by ring
+    _ = 1 := by
+      apply div_self
+      exact f.determinant_ne_zero
+
 
 -- The set of linear fractional transformations forms a group under composition
 instance : Group (LinearFracTrans) where
@@ -2207,8 +2343,6 @@ instance : Group (LinearFracTrans) where
     apply lft_mul_left_inv
 
 
-<<<<<<< Updated upstream
-=======
 
 
 /-
@@ -2632,7 +2766,6 @@ theorem exist_LFT_mapping_three_point (z1 z2 z3 w1 w2 w3 : EComplex)
    trivial
 
 
->>>>>>> Stashed changes
 -- Define the scalar multiplication (Action)
 -- This enables the usage of `f • z` instead of `f z`
 instance : SMul LinearFracTrans EComplex where
@@ -2653,8 +2786,6 @@ instance : MulAction LinearFracTrans EComplex where
 -- #synth MulAction LinearFracTrans EComplex
 
 
-<<<<<<< Updated upstream
-=======
 --Define when two LFTs have proportional coefficients
 
 def Proportional (f1 f2 : LinearFracTrans) : Prop :=
@@ -3614,7 +3745,6 @@ theorem lft_uniqueness (f g : LinearFracTrans) (z1 z2 z3 : EComplex)
     _ = g.apply z := by rw [this]
 
 
->>>>>>> Stashed changes
 example (f : LinearFracTrans) (z : EComplex) :
   f • z = f z := rfl
 
@@ -3850,7 +3980,12 @@ lemma cross_ratio_lft_num_denom (f : LinearFracTrans) (z0 z1 z2 z3 : ℂ)
 
 
 
-
+/--
+The cross ratio of four points in the extended complex plane is invariant under
+any linear fractional transformation (Möbius transformation). For any four points
+z₁, z₂, z₃, z₄ ∈ ℂ∞ and any LFT f(z) = (a z + b) / (c z + d) with ad - bc ≠ 0,
+we have cross_ratio (f z₁) (f z₂) (f z₃) (f z₄) = cross_ratio z₁ z₂ z₃ z₄.
+-/
 theorem cross_ratio_invariant (f : LinearFracTrans)
     (z0 z1 z2 z3 : EComplex)
     (h_distinct : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) :
@@ -5259,6 +5394,369 @@ theorem cross_ratio_invariant (f : LinearFracTrans)
     | _, none, none, _ => exact absurd rfl h12
     | _, none, _, none => exact absurd rfl h13
     | _, _, none, none => exact absurd rfl h23
+
+
+
+--Lemma (Swap Inverse):
+--Swapping the second and fourth arguments of the cross ratio yields the multiplicative inverse.
+lemma cross_ratio_swap_13_inv (z0 z1 z2 z3 : EComplex)
+    (h_distinct : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) :
+    cross_ratio z0 z3 z2 z1 = 1 / cross_ratio z0 z1 z2 z3 := by
+  -- Extract distinctness facts we'll need
+  -- h01 : z0 ≠ z1, h02 : z0 ≠ z2, h03 : z0 ≠ z3
+  -- h12 : z1 ≠ z2, h13 : z1 ≠ z3, h23 : z2 ≠ z3
+  have h01 : z0 ≠ z1 := by exact pairwise_distinct_0_1 h_distinct
+  have h02 : z0 ≠ z2 := by exact pairwise_distinct_0_2 h_distinct
+  have h03 : z0 ≠ z3 := by exact pairwise_distinct_0_3 h_distinct
+  have h12 : z1 ≠ z2 := by exact pairwise_distinct_1_2 h_distinct
+  have h13 : z1 ≠ z3 := by exact pairwise_distinct_1_3 h_distinct
+  have h23 : z2 ≠ z3 := by exact pairwise_distinct_2_3 h_distinct
+  -- Case split on which point is infinity
+  cases z0 with
+  | none =>
+    -- z0 = ∞
+    cases z1 with
+    | none => contradiction
+    | some b =>
+      cases z2 with
+      | none => contradiction
+      | some c =>
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case: z0 = ∞, z1 = some b, z2 = some c, z3 = some d
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          -- Extract c ≠ d from h23 : some c ≠ some d
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          -- Get the nonzero differences
+          have hcb : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          have hdc : c - d ≠ 0 := sub_ne_zero.mpr (Ne.symm hcd.symm)
+          -- Unfold cross_ratio and simplify
+          simp only [cross_ratio]
+          rw [sub_some c b, sub_some c d]
+          rw [one_div_div (c - d) (c - b) hdc hcb]
+  | some a =>
+    cases z1 with
+    | none =>
+      -- z1 = ∞
+      cases z2 with
+      | none => contradiction
+      | some c =>
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case: z0 = some a, z1 = ∞, z2 = some c, z3 = some d
+          -- Extract a ≠ d from h03 : some a ≠ some d
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+          -- Extract c ≠ d from h23 : some c ≠ some d
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          -- Get the nonzero differences
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+          have hcd' : c - d ≠ 0 := sub_ne_zero.mpr hcd
+         -- Unfold cross_ratio and simplify
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some a d, sub_some c d]
+          rw [one_div_div (c - d) (a - d) hcd' had']
+    | some b =>
+      cases z2 with
+      | none =>
+        -- z2 = ∞
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case: z0 = some a, z1 = some b, z2 = ∞, z3 = some d
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+         -- Extract a ≠ d from h03 : some a ≠ some d
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+        -- Get the nonzero differences
+          have hab' : a - b ≠ 0 := sub_ne_zero.mpr hab
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+        -- Unfold cross_ratio and simplify
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some a d, sub_some a b]
+          rw [one_div_div (a - b) (a - d) hab' had']
+      | some c =>
+        cases z3 with
+        | none =>
+          -- Case: z0 = some a, z1 = some b, z2 = some c, z3 = ∞
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+          -- Extract b ≠ c from h12 : some b ≠ some c
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          -- Get the nonzero differences
+          have hab' : a - b ≠ 0 := sub_ne_zero.mpr hab
+          have hcb' : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          -- Unfold cross_ratio and simplify
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some c b, sub_some a b]
+          rw [one_div_div (a - b) (c - b) hab' hcb']
+        | some d =>
+          -- Case: all finite (main case)
+          -- z0 = some a, z1 = some b, z2 = some c, z3 = some d
+          -- Case: z0 = some a, z1 = some b, z2 = some c, z3 = some d (all finite)
+          -- Extract distinctness
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+          have hac : a ≠ c := by
+            intro heq
+            apply h02
+            rw [heq]
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          have hbd : b ≠ d := by
+            intro heq
+            apply h13
+            rw [heq]
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          -- Get nonzero differences
+          have hab' : a - b ≠ 0 := sub_ne_zero.mpr hab
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+          have hcb' : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          have hcd' : c - d ≠ 0 := sub_ne_zero.mpr (Ne.symm hcd.symm)
+          -- Unfold cross_ratio
+          simp only [cross_ratio]
+          -- Rewrite using sub_some
+          rw [sub_some a d, sub_some a b, sub_some c b, sub_some c d]
+          -- Use div_mul_div to combine fractions
+          rw [div_mul_div (a - d) (a - b) (c - b) (c - d) hab' hcd']
+          rw [div_mul_div (a - b) (a - d) (c - d) (c - b) had' hcb']
+          -- Now we have: some X / some Y = 1 / (some Y / some X)
+          -- where X = (a-d)*(c-b) and Y = (a-b)*(c-d)
+          have hX : (a - d) * (c - b) ≠ 0 := mul_ne_zero had' hcb'
+          have hY : (a - b) * (c - d) ≠ 0 := mul_ne_zero hab' hcd'
+          rw [one_div_div ((a - b) * (c - d)) ((a - d) * (c - b)) hY hX]
+
+
+/-
+Lemma (Swap Complement): Swapping the second and third arguments of the cross ratio yields the additive complement.
+That is, if λ = (z0, z1; z2, z3), then (z0, z2; z1, z3) = 1 − λ.
+This is the second of two generators needed to produce all six values of the cross ratio under permutation.
+-/
+lemma cross_ratio_swap_12_complement (z0 z1 z2 z3 : EComplex)
+    (h_distinct : List.Pairwise (· ≠ ·) [z0, z1, z2, z3]) :
+    cross_ratio z0 z2 z1 z3 = 1 - cross_ratio z0 z1 z2 z3 := by
+  -- Extract distinctness facts
+  have h01 : z0 ≠ z1 := by exact pairwise_distinct_0_1 h_distinct
+  have h02 : z0 ≠ z2 := by exact pairwise_distinct_0_2 h_distinct
+  have h03 : z0 ≠ z3 := by exact pairwise_distinct_0_3 h_distinct
+  have h12 : z1 ≠ z2 := by exact pairwise_distinct_1_2 h_distinct
+  have h13 : z1 ≠ z3 := by exact pairwise_distinct_1_3 h_distinct
+  have h23 : z2 ≠ z3 := by exact pairwise_distinct_2_3 h_distinct
+  -- Case split on which point is infinity
+  cases z0 with
+  | none =>
+    -- z0 = ∞
+    cases z1 with
+    | none => contradiction
+    | some b =>
+      cases z2 with
+      | none => contradiction
+      | some c =>
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case 1: z0 = ∞, z1 = some b, z2 = some c, z3 = some d
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          have hbd : b ≠ d := by
+            intro heq
+            apply h13
+            rw [heq]
+          have hbc' : b - c ≠ 0 := sub_ne_zero.mpr hbc
+          have hcb' : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          simp only [cross_ratio]
+          rw [sub_some b d, sub_some b c, sub_some c d, sub_some c b]
+          rw [one_sub_div (c - d) (c - b) hcb']
+          have hnum : (c - b) - (c - d) = -(b - d) := by ring
+          have hden : c - b = -(b - c) := by ring
+          rw [hnum, hden]
+          rw [neg_div_neg (b - d) (b - c) hbc']
+
+  | some a =>
+    cases z1 with
+    | none =>
+      -- z1 = ∞
+      cases z2 with
+      | none => contradiction
+      | some c =>
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case 2: z0 = some a, z1 = ∞, z2 = some c, z3 = some d
+          have hac : a ≠ c := by
+            intro heq
+            apply h02
+            rw [heq]
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some a c, sub_some a d, sub_some c d]
+          rw [one_sub_div (c - d) (a - d) had']
+          -- Goal: some (a - c) / some (a - d) = some ((a - d) - (c - d)) / some (a - d)
+          -- Simplify numerator: (a - d) - (c - d) = a - c
+          have hnum : (a - d) - (c - d) = a - c := by ring
+          rw [hnum]
+    | some b =>
+      cases z2 with
+      | none =>
+        -- z2 = ∞
+        cases z3 with
+        | none => contradiction
+        | some d =>
+          -- Case 3: z0 = some a, z1 = some b, z2 = ∞, z3 = some d
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+          have hbd : b ≠ d := by
+            intro heq
+            apply h13
+            rw [heq]
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some b d, sub_some a d, sub_some a b]
+          rw [one_sub_div (a - b) (a - d) had']
+          have hnum : (a - d) - (a - b) = b - d := by ring
+          rw [hnum]
+      | some c =>
+        cases z3 with
+        | none =>
+          -- Case 4: z0 = some a, z1 = some b, z2 = some c, z3 = ∞
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+          have hac : a ≠ c := by
+            intro heq
+            apply h02
+            rw [heq]
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          have hbc' : b - c ≠ 0 := sub_ne_zero.mpr hbc
+          have hcb' : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          simp only [cross_ratio]
+          have typechangea : Option.some a = some a := rfl
+          rw [typechangea]
+          rw [sub_some a c, sub_some b c, sub_some a b, sub_some c b]
+          rw [one_sub_div (a - b) (c - b) hcb']
+          have hnum : (c - b) - (a - b) = -(a - c) := by ring
+          have hden : c - b = -(b - c) := by ring
+          rw [hnum, hden]
+          rw [neg_div_neg (a - c) (b - c) hbc']
+        | some d =>
+          -- Case 5: all finite (main case)
+          have hab : a ≠ b := by
+            intro heq
+            apply h01
+            rw [heq]
+          have hac : a ≠ c := by
+            intro heq
+            apply h02
+            rw [heq]
+          have had : a ≠ d := by
+            intro heq
+            apply h03
+            rw [heq]
+          have hbc : b ≠ c := by
+            intro heq
+            apply h12
+            rw [heq]
+          have hbd : b ≠ d := by
+            intro heq
+            apply h13
+            rw [heq]
+          have hcd : c ≠ d := by
+            intro heq
+            apply h23
+            rw [heq]
+          have had' : a - d ≠ 0 := sub_ne_zero.mpr had
+          have hab' : a - b ≠ 0 := sub_ne_zero.mpr hab
+          have hac' : a - c ≠ 0 := sub_ne_zero.mpr hac
+          have hbc' : b - c ≠ 0 := sub_ne_zero.mpr hbc
+          have hcb' : c - b ≠ 0 := sub_ne_zero.mpr (Ne.symm hbc)
+          have hbd' : b - d ≠ 0 := sub_ne_zero.mpr hbd
+          have hcd' : c - d ≠ 0 := sub_ne_zero.mpr (Ne.symm hcd.symm)
+          simp only [cross_ratio]
+          rw [sub_some a c, sub_some a d, sub_some b d, sub_some b c]
+          rw [sub_some a b, sub_some c d, sub_some c b]
+          rw [div_mul_div (a - c) (a - d) (b - d) (b - c) had' hbc']
+          rw [one_sub_mul_div_div (a - b) (a - d) (c - d) (c - b) had' hcb']
+          have hnum : (a - d) * (c - b) - (a - b) * (c - d) = (a - c) * (d - b) := by ring
+          have hnum' : (a - c) * (d - b) = -((a - c) * (b - d)) := by ring
+          have hden : (a - d) * (c - b) = -((a - d) * (b - c)) := by ring
+          rw [hnum, hnum', hden]
+          have hprod1 : (a - d) * (b - c) ≠ 0 := mul_ne_zero had' hbc'
+          have hprod2 : (a - c) * (b - d) ≠ 0 := mul_ne_zero hac' hbd'
+          rw [neg_div_neg ((a - c) * (b - d)) ((a - d) * (b - c)) hprod1]
+
+
+
+
+
+
 
 
 #check LinearFracTrans.apply_sub_apply
