@@ -2,7 +2,9 @@ import Mathlib.Tactic
 import Mathlib.Data.Real.Basic
 
 
-/- We rewrite the complex number game created by Kelvin Buzzard
+/- 
+  Similar to the Natural Number Game,
+  we rewrite the complex number game 
   with rationl numbers as the real and imaginary parts.
 
   Mathematically, the structure implemented is ℚ[i]. The real
@@ -12,20 +14,16 @@ import Mathlib.Data.Real.Basic
   instead of ℂ.
 -/
 
-set_option linter.dupNamespace false
+-- set_option linter.dupNamespace false
 
-namespace complexQ
-
-open ComplexConjugate
+namespace complex_number_game
 
 -------------------------------------
 --   Construction of complex number
 -------------------------------------
 
-
-
 -- A complex number with rational real and imaginary parts
-@[ext] structure complexQ :=
+@[ext] structure complexQ where
   re : ℚ   -- real part
   im : ℚ   -- imaginary part
  deriving Repr
@@ -100,6 +98,14 @@ lemma ext_iff {z w : ℚ[i]} : z = w ↔ z.re = w.re ∧ z.im = w.im
  special elements in complexQ
 -/
 
+-- Define the numeral 0 explicitly
+instance : OfNat complexQ 0 where
+  ofNat := ⟨0, 0⟩
+
+-- Define the numeral 1 explicitly
+instance : OfNat complexQ 1 where
+  ofNat := ⟨1, 0⟩
+
 -- the complex number 0
 def zero : ℚ[i] := ⟨0,0⟩
 
@@ -157,7 +163,7 @@ instance : Neg ℚ[i] :=
 @[simp] lemma add_re (x y : ℚ[i]) : (x+y).re = x.re+y.re := rfl
 @[simp] lemma add_im (x y : ℚ[i]) : (x+y).im = x.im+y.im := rfl
 
-@[simp] lemma neg_re (x : ℚ[i]) : (-x).re = -x.re := rfl
+@[simp]  lemma neg_re (x : ℚ[i]) : (-x).re = -x.re := rfl
 @[simp] lemma neg_im (x : ℚ[i]) : (-x).im = -x.im := rfl
 
 @[simp] lemma mul_re (x y: ℚ[i]) : (x*y).re = x.re*y.re - x.im*y.im := rfl
@@ -288,32 +294,36 @@ lemma ofRational_add (r s : ℚ) : ( (r+s :ℚ) : ℚ[i]) = r+s := by
 theorem ofRational_mul (r s : ℚ) : ((r * s : ℚ) : ℚ[i]) = r * s := by
   apply ext_iff.mpr
   constructor
-  repeat dsimp ; simp [ofRational]
+  repeat dsimp <;> 
+  simp [mul_zero, sub_zero]
 
 theorem re_ofRational_mul (r : ℚ) (z : ℚ[i])
   : (r * z).re = r * z.re := by
-  dsimp ; simp [ofRational]
+  dsimp  
+  simp only [zero_mul, sub_zero]
 
 theorem im_ofRational_mul (r : ℚ) (z : ℚ[i])
   : (r * z).im = r * z.im := by
-  dsimp ;  simp [ofRational]
+  dsimp
+  simp only [zero_mul, add_zero]
 
 lemma re_mul_ofRational (z : ℚ[i]) (r : ℚ)
-  : (z * r).re = z.re *  r := by dsimp; simp [ofRational]
+  : (z * r).re = z.re *  r := by dsimp; simp only [mul_zero, sub_zero] 
 
 lemma im_mul_ofRational (z : ℚ[i]) (r : ℚ)
-  : (z * r).im = z.im *  r := by dsimp; simp [ofRational]
+  : (z * r).im = z.im *  r := by dsimp; simp only [mul_zero, zero_add]
 
 @[simp]
 theorem ofRational_mul' (r : ℚ) (z : ℚ[i]) : ↑r * z = ⟨r * z.re, r * z.im⟩ :=
   ext (re_ofRational_mul _ _) (im_ofRational_mul _ _)
 
 theorem mk_eq_add_mul_I (a b : ℚ) : (complexQ.mk a b) = a + b * I :=
-  ext_iff.2 <| by dsimp ; simp [ofRational]
+  ext_iff.2 <| by dsimp ; simp only 
+    [mul_zero, mul_one, sub_self, add_zero, zero_add, and_self]
 
 @[simp]
 theorem re_add_im (z : ℚ[i]) : (z.re : ℚ[i]) + z.im * I = z :=
-  ext_iff.2 <| by dsimp ; simp [ofRational]
+  ext_iff.2 <| by dsimp ; simp only [mul_zero, mul_one, sub_self, add_zero, zero_add, and_self]
 
 theorem mul_I_re (z : ℚ[i]) : (z * I).re = -z.im := by simp
 
@@ -337,8 +347,6 @@ instance : Nontrivial ℚ[i] := by
 -----------------------------------------
 --  Scalar multiplication
 -----------------------------------------
-
-
 
 namespace SMul
 
@@ -404,7 +412,7 @@ instance addCommGroup : AddCommGroup ℚ[i] where
       ring
     · rw [add_im a b, add_im b a]
       ring
-  add_left_neg := by
+  neg_add_cancel := by
     intro a
     ext
     · rw [add_re (-a) a, neg_re a, zero_def]
@@ -416,42 +424,57 @@ instance addCommGroup : AddCommGroup ℚ[i] where
   nsmul_zero := by
     intro ; ext <;> dsimp <;> simp [smul_re, smul_im]
   nsmul_succ := by
-   intros; ext <;> simp [AddMonoid.nsmul_succ, add_mul, add_comm,
+   intros; ext <;> simp [add_mul, add_comm,
         smul_re, smul_im]
   zsmul_succ' := by
-    intros; ext <;> simp [SubNegMonoid.zsmul_succ', add_mul, add_comm,
+    intros; ext <;> simp [add_mul, add_comm,
       smul_re, smul_im]
   zsmul_neg' := by
-    intros; ext <;> simp [zsmul_neg', add_mul, smul_re, smul_im]
+    intros; ext <;> simp [add_mul, smul_re, smul_im]
 
 
 -- After verifying that the additive group structure,
 -- we can now do subtraction
 #eval sample1 - sample3
 
-
+instance : One complexQ where
+  one := ⟨1, 0⟩
 
 -- Casting from `ℕ` and `ℤ` to `ℚ[i]`
 
-instance addGroupWithOne : AddGroupWithOne ℚ[i] :=
-{  complexQ.addCommGroup with
-  natCast := fun n => ⟨n, 0⟩
-  natCast_succ := fun _ => by ext <;> simp [Nat.cast, AddMonoidWithOne.natCast_succ]
-  intCast := fun n => ⟨n, 0⟩
-  intCast_ofNat := fun _ => by ext <;> rfl
+instance addGroupWithOne : AddGroupWithOne complexQ where
+  -- 1. Automatically inherit AddGroup from your previously defined AddCommGroup
+  toAddGroup := inferInstance
+  
+  -- 2. Explicitly construct the '1' element
+  one := ⟨1, 0⟩
+  
+  -- 3. Explicitly state the typecast to ℚ
+  natCast n := ⟨(n : ℚ), 0⟩
   natCast_zero := by
-      ext
-      · dsimp
-        simp [Nat.cast]
-      · dsimp
-  intCast_negSucc := fun n => by
-    simp [add_comm]
     ext
-    · simp [AddGroupWithOne.intCast_negSucc, Nat.cast]
-      ring
+    · exact Nat.cast_zero
     · rfl
-  one := 1
-}
+  natCast_succ n := by
+    push_cast
+    ext
+    · -- Solves the real part: ↑(n + 1) = ↑n + 1
+      rfl
+    · -- Solves the imaginary part: 0 = complexQ.im 1
+      push_cast
+      simp
+          
+  intCast n := ⟨(n : ℚ), 0⟩
+  intCast_ofNat n := by
+    ext
+    · push_cast; rfl
+    · rfl
+  intCast_negSucc n := by
+    ext
+    · push_cast
+      grind [neg_re]
+    · rfl
+
 
 -- Multiplication by integers are now enabled
 #eval 4 * sample1
@@ -471,9 +494,11 @@ instance commRing : CommRing ℚ[i] := {
     intros; ext <;> simp [mul_re, mul_im] <;> ring
   zero_mul := by intros; ext <;> dsimp <;> simp [zero_mul]
   mul_zero := by intros; ext <;> dsimp <;> simp [mul_zero]
-  mul_assoc := by intros; ext <;> simp [mul_assoc] <;> ring
-  one_mul := by intros; ext <;> simp [one_mul]
-  mul_one := by intros; ext <;> simp [mul_one]
+  mul_assoc := by intros; ext <;> simp only [mul_re, mul_im] <;> ring
+  one_mul := by 
+    intros; 
+    ext <;> simp
+  mul_one := by intros; ext <;> simp
   mul_comm := by intros; ext <;> simp [mul_comm]; ring
 }
 
@@ -498,8 +523,13 @@ instance : StarRing ℚ[i] where
   star_mul a b := by ext <;> simp [add_comm] <;> ring
   star_add a b := by ext <;> simp [add_comm]
 
--- The conjugation function `starRingEnd ℚ[i]` can be invoked
+-- One we have set up ℚ[i] as a StarRing,
+-- the conjugation function `starRingEnd ℚ[i]` can be invoked
 -- by `conj` in the namespace `ComplexConjugate`
+
+open ComplexConjugate
+
+-- notation "conj" => (starRingEnd ℂ)
 
 @[simp]
 lemma conj_re (z : ℚ[i]) : (conj z).re = z.re := rfl
@@ -508,7 +538,7 @@ lemma conj_re (z : ℚ[i]) : (conj z).re = z.re := rfl
 lemma conj_im (z : ℚ[i]) : (conj z).im = -z.im := rfl
 
 theorem conj_ofReal (r : ℚ) : conj (r : ℚ[i]) = r :=
-  ext_iff.mpr <| by simp [star]
+  ext_iff.mpr <| by simp
 
 @[simp]
 lemma conj_I : conj I = -I := by
@@ -545,10 +575,9 @@ theorem star_def : (Star.star : ℂ → ℂ) = conj :=
 def normSq : ℚ[i]  →*₀ ℚ  where
   toFun z := z.re * z.re + z.im * z.im
   map_zero' := by dsimp; simp
-  map_one' := by simp
-  map_mul' z w := by
-    simp ; ring
-
+  map_one' := by simp [one_def, ofRational_def, 
+  ofRational_re, mul_one, ofRational_im, mul_zero, add_zero]
+  map_mul' z w := by simp; ring
 
 theorem normSq_apply (z : ℚ[i]) : normSq z = z.re * z.re + z.im * z.im :=
   rfl
@@ -622,7 +651,7 @@ theorem mul_conj (z : ℚ[i]) : z * conj z = normSq z := by
 
 theorem add_conj (z : ℚ[i]) : z + conj z = (2 * z.re : ℚ) := by
   apply ext_iff.mpr
-  dsimp ; simp [normSq]
+  dsimp ; simp only [add_neg_cancel, and_true]
   ring
 
 
@@ -660,6 +689,7 @@ theorem sub_im (z w : ℚ[i]) : (z - w).im = z.im - w.im := by
   rw [(by rfl : z-w  = z+(-w)), add_im, neg_im]
   ring
 
+
 @[simp, norm_cast]
 theorem ofRational_sub (r s : ℚ) : ((r - s : ℚ) : ℚ[i]) = r - s := by
   apply ext_iff.mpr
@@ -669,7 +699,8 @@ theorem ofRational_sub (r s : ℚ) : ((r - s : ℚ) : ℚ[i]) = r - s := by
 theorem ofRational_pow (r : ℚ) (n : ℕ)
   : ((r^n : ℚ) : ℚ[i]) = (r : ℚ[i])^n := by
   induction' n with n hn
-  · rfl
+  · rw [pow_zero, pow_zero]
+    rfl
   · -- inductive step
     rw [pow_succ, ofRational_mul, hn]
     ring
@@ -713,19 +744,18 @@ theorem ofRational_inv (r : ℚ) : ((r⁻¹ : ℚ) : ℚ[i]) = (r : ℚ[i])⁻¹
   apply ext_iff.2
   simp [normSq]
 
-protected theorem inv_zero : (0⁻¹ : ℚ[i]) = 0 := by
+protected theorem complexQ.inv_zero : (0⁻¹ : ℚ[i]) = 0 := by
   rw [← ofRational_zero]
   rw [← ofRational_inv]
   rw [inv_zero]
 
-protected theorem mul_inv_cancel {z : ℚ[i]} (h : z ≠ 0) : z * z⁻¹ = 1 := by
+protected theorem complexQ.mul_inv_cancel {z : ℚ[i]} (h : z ≠ 0) : z * z⁻¹ = 1 := by
   rw [inv_def]
   rw [← mul_assoc]
   rw [mul_conj]
   rw [← ofRational_mul]
-  rw [mul_inv_cancel]
-  · rfl
-  · exact mt normSq_eq_zero.1 h
+  norm_cast
+  exact mul_inv_cancel₀ (mt normSq_eq_zero.1 h)
 
 
 
@@ -819,19 +849,19 @@ lemma ofRational_zsmul (n : ℤ) (r : ℚ) : ↑(n • r) = n • (r : ℚ[i]) :
 ------------------------------------------
 
 instance instField : Field ℚ[i] where
-  mul_inv_cancel := @complexQ.mul_inv_cancel
+  mul_inv_cancel := fun z hz => complexQ.mul_inv_cancel hz
   inv_zero := complexQ.inv_zero
   nnqsmul := (· • ·)
   qsmul := (· • ·)
-  qsmul_def q z := ext_iff.2 <| by simp [Rat.smul_def, smul_re, smul_im]
+  qsmul_def q z := ext_iff.2 <| by simp
   ratCast_def q := by
     ext
-    · simp [Rat.cast_def]
-      simp [div_re, div_im]
+    · simp only [ratCast_re]
+      simp [div_re]
       simp [mul_div_mul_comm]
       exact (Rat.num_div_den q).symm
-    · simp [Rat.cast_def]
-      simp [div_re, div_im]
+    · simp only [ratCast_im]
+      simp [div_im]
   nnqsmul_def n z :=
     ext_iff.2 <| by simp [NNRat.smul_def, smul_re, smul_im]
   nnratCast_def q := by ext <;> simp [NNRat.cast_def, div_re, div_im, mul_div_mul_comm]
@@ -845,11 +875,13 @@ lemma ofReal_nnqsmul (q : ℚ≥0) (r : ℚ) : ofRational (q • r) = q • r :=
 @[simp, norm_cast]
 lemma ofReal_qsmul (q : ℚ) (r : ℚ) : ofRational (q • r) = q • r := by
   ext
-  repeat simp[NNRat.smul_def]
+  repeat simp [smul_eq_mul, ofRational_ratCast, ratCast_re,
+    rational_smul, mul_re, ratCast_im,
+    mul_zero, sub_zero]
 
 
-theorem conj_inv (x : ℚ[i]) : conj x⁻¹ = (conj x)⁻¹ :=
-  star_inv' _
+theorem conj_inv (x : ℚ[i]) : conj x⁻¹ = (conj x)⁻¹ := by
+  simp only [map_inv₀]
 
 
 @[simp, norm_cast]
@@ -864,7 +896,7 @@ theorem ofReal_zpow (r : ℚ) (n : ℤ) : ((r ^ n : ℚ) : ℚ[i]) = (r : ℚ[i]
 @[simp]
 theorem div_I (z : ℚ[i]) : z / I = -(z * I) := by
   apply (div_eq_iff_mul_eq I_ne_zero).2
-  simp [←mul_assoc]
+  simp 
   calc
     -(z * I * I) = -(z*(I*I)) := by ring
                _ = -(z*(-1)) := by rw [I_mul_I]
@@ -950,8 +982,10 @@ theorem im_eq_add_conj (z : ℚ[i]) : (z.im : ℚ) = (z - conj z) / (I*2) := by
   rw [ofRational_mul]
   rw [mul_comm]
   rw [← mul_assoc]
-  simp [mul_div_cancel_left₀ _ (mul_ne_zero I_ne_zero two_ne_zero : I*2 ≠ 0)]
-
+  push_cast
+  rw [mul_div_cancel_left₀ _ ?_]
+  · rfl
+  · norm_num
 
 -- a random calculation
 #eval 2*((2-I)*(2+I/6)/(I*5/3) + 5/2)
@@ -994,8 +1028,4 @@ example  {H A B A' B' T: ℚ[i]}
   ring
 
 
-
-
-#check Nat
-
-end complexQ
+end complex_number_game
