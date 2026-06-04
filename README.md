@@ -4,3 +4,6 @@ The folder `BrownChurchill` contains LEAN solution to the book "Complex variable
 
 LEAN formalation of my lecture notes on complex variables is in the folder `MAT3253`.
 
+I am writing documentation for the machine-checked proofs using Lean Verso. The proofs in this page will be amalgamated in [MAT3253 Lean proofs](failed to synthesize instance of type class
+  IsScalarTower ℝ ℂ ℂ)
+
