@@ -1,0 +1,20 @@
+name = "basic-book"
+defaultTargets = ["ComplexAnalysis", "generate-book"]
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso"
+rev = "v4.29.0"
+
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.29.0"
+
+[[lean_lib]]
+name = "ComplexAnalysis"
+
+[[lean_exe]]
+name = "generate-book"
+root = "Main"
