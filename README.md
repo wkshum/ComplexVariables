@@ -1,4 +1,4 @@
-# Lean formaliation of Complex Analysis
+# Lean Formalization of Complex Analysis
 
 LEAN formalation of some lecture notes on complex variables is in the folder [`ComplexAnalysis`](https://github.com/wkshum/ComplexVariables/tree/main/ComplexAnalysis).
 - Section 2.2. Extended Complex Number System
