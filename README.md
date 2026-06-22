@@ -1,6 +1,6 @@
 # Lean formaliation of Complex Analysis
 
-LEAN formalation of some lecture notes on complex variables is in the folder `ComplexVariables`.
+LEAN formalation of some lecture notes on complex variables is in the folder [`ComplexAnalysis`](https://github.wkshum.io/ComplexAnalysis/).
 
 I am writing documentation for the machine-checked proofs using Lean Verso [MAT3253 Lean proofs](https://wkshum.github.io/ComplexAnalysis/)
 
